@@ -1,0 +1,107 @@
+<Window
+    x:Class="ExecutionContinuity.App.MainWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Title="Execution Continuity">
+    <Grid x:Name="RootGrid" Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+        <Grid Margin="28,28,28,20">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <StackPanel Spacing="2">
+                <TextBlock Text="Execution Continuity" Style="{ThemeResource TitleTextBlockStyle}" />
+                <TextBlock Text="Prepared routes, one next action." Opacity="0.68" />
+            </StackPanel>
+            <Button x:Name="PlanningButton" Grid.Column="1" Content="Planning" Click="PlanningButton_Click" VerticalAlignment="Center" />
+        </Grid>
+
+        <ScrollViewer Grid.Row="1" Margin="28,0,28,28" HorizontalScrollBarVisibility="Disabled">
+            <StackPanel MaxWidth="760" Spacing="18">
+                <InfoBar x:Name="StatusBar" IsOpen="False" IsClosable="False" />
+
+                <StackPanel x:Name="GuidePanel" Spacing="14">
+                    <TextBlock x:Name="GuideHeading" Style="{ThemeResource SubtitleTextBlockStyle}" />
+                    <TextBlock x:Name="GuideActionText" TextWrapping="Wrap" Style="{ThemeResource TitleTextBlockStyle}" />
+                    <StackPanel x:Name="GuidancePanel" Spacing="6">
+                        <TextBlock x:Name="CompletionText" TextWrapping="Wrap" />
+                        <TextBlock x:Name="BoundaryText" TextWrapping="Wrap" Opacity="0.74" />
+                    </StackPanel>
+                    <StackPanel x:Name="NormalControls" Orientation="Horizontal" Spacing="10">
+                        <Button x:Name="CompleteCurrentButton" Content="Complete action" Click="CompleteCurrentButton_Click" />
+                        <Button x:Name="StuckButton" Content="I'm stuck" Click="StuckButton_Click" />
+                    </StackPanel>
+                    <StackPanel x:Name="FallbackControls" Spacing="8">
+                        <Button Content="Finished fallback: return to action" Click="CompleteFallbackButton_Click" HorizontalAlignment="Left" />
+                    </StackPanel>
+                    <StackPanel x:Name="BlockedControls" Spacing="10">
+                        <TextBlock Text="The return point is saved." />
+                        <StackPanel Orientation="Horizontal" Spacing="10">
+                            <Button Content="Return to current action" Click="ReturnFromBlockedButton_Click" />
+                            <Button Content="Pause now and return here later" Click="PauseFromBlockedButton_Click" />
+                        </StackPanel>
+                    </StackPanel>
+                    <StackPanel x:Name="BlockEntryPanel" Spacing="10">
+                        <TextBlock Text="Write one sentence about what is blocking this action." TextWrapping="Wrap" />
+                        <TextBox x:Name="BlockInput" PlaceholderText="One sentence" MaxLength="280" />
+                        <StackPanel Orientation="Horizontal" Spacing="10">
+                            <Button Content="Save return point" Click="SaveBlockButton_Click" />
+                            <Button Content="Return" Click="CancelBlockButton_Click" />
+                        </StackPanel>
+                    </StackPanel>
+                    <StackPanel x:Name="PausePanel" Spacing="8">
+                        <TextBox x:Name="PauseNoteInput" PlaceholderText="Optional pause note" AcceptsReturn="True" TextWrapping="Wrap" />
+                        <Button Content="Pause and save return point" Click="PauseButton_Click" HorizontalAlignment="Left" />
+                    </StackPanel>
+                    <StackPanel x:Name="CapturePanel" Spacing="8">
+                        <TextBox x:Name="CaptureInput" PlaceholderText="Capture an idea without changing this action" AcceptsReturn="True" TextWrapping="Wrap" />
+                        <Button Content="Save capture" Click="CaptureButton_Click" HorizontalAlignment="Left" />
+                    </StackPanel>
+                </StackPanel>
+
+                <StackPanel x:Name="NoActivePanel" Spacing="14">
+                    <TextBlock Text="No active route" Style="{ThemeResource SubtitleTextBlockStyle}" />
+                    <TextBlock Text="Enter planning mode to select or create the next route." TextWrapping="Wrap" />
+                    <Button Content="Enter planning mode" Click="PlanningButton_Click" HorizontalAlignment="Left" />
+                    <StackPanel Spacing="8">
+                        <TextBox x:Name="NoActiveCaptureInput" PlaceholderText="Capture an idea" AcceptsReturn="True" TextWrapping="Wrap" />
+                        <Button Content="Save capture" Click="NoActiveCaptureButton_Click" HorizontalAlignment="Left" />
+                    </StackPanel>
+                </StackPanel>
+
+                <StackPanel x:Name="PlanningPanel" Spacing="16">
+                    <StackPanel Orientation="Horizontal" Spacing="10">
+                        <TextBlock Text="Planning" Style="{ThemeResource SubtitleTextBlockStyle}" VerticalAlignment="Center" />
+                        <Button Content="Return to guide" Click="GuideButton_Click" />
+                    </StackPanel>
+                    <StackPanel Spacing="8">
+                        <TextBlock Text="Create a prepared route" Style="{ThemeResource BodyStrongTextBlockStyle}" />
+                        <TextBox x:Name="RouteTitleInput" PlaceholderText="Route title" />
+                        <TextBox x:Name="RouteActionInput" PlaceholderText="First executable action" AcceptsReturn="True" TextWrapping="Wrap" />
+                        <TextBox x:Name="CompletionStandardInput" PlaceholderText="Completion standard" AcceptsReturn="True" TextWrapping="Wrap" />
+                        <TextBox x:Name="DoNotDoInput" PlaceholderText="Do not do" AcceptsReturn="True" TextWrapping="Wrap" />
+                        <TextBox x:Name="FallbackActionInput" PlaceholderText="Optional prepared fallback" AcceptsReturn="True" TextWrapping="Wrap" />
+                        <StackPanel Orientation="Horizontal" Spacing="10">
+                            <Button x:Name="AddStepButton" Content="Add step" Click="AddStepButton_Click" />
+                            <Button Content="Clear step" Click="ClearStepButton_Click" />
+                        </StackPanel>
+                        <StackPanel x:Name="DraftStepsPanel" Spacing="6" />
+                        <Button x:Name="SaveRouteButton" Content="Save draft route" Click="CreateRouteButton_Click" HorizontalAlignment="Left" />
+                    </StackPanel>
+                    <StackPanel Spacing="8">
+                        <TextBlock Text="Routes" Style="{ThemeResource BodyStrongTextBlockStyle}" />
+                        <StackPanel x:Name="RouteListPanel" Spacing="8" />
+                    </StackPanel>
+                    <StackPanel Spacing="8">
+                        <TextBlock Text="Captured ideas" Style="{ThemeResource BodyStrongTextBlockStyle}" />
+                        <StackPanel x:Name="InboxPanel" Spacing="6" />
+                    </StackPanel>
+                </StackPanel>
+            </StackPanel>
+        </ScrollViewer>
+    </Grid>
+</Window>

@@ -1,6 +1,4 @@
 using Microsoft.UI.Xaml;
-using System.Reflection;
-using System.Text;
 
 namespace ExecutionContinuity.App;
 
@@ -10,56 +8,43 @@ public partial class App : Application
 
     public App()
     {
+        StartupDiagnostics.Trace("App constructor entered");
         try
         {
+            StartupDiagnostics.Trace("App constructor before InitializeComponent");
             InitializeComponent();
+            StartupDiagnostics.Trace("App constructor after InitializeComponent");
+            UnhandledException += App_UnhandledException;
+            StartupDiagnostics.Trace("App constructor completed");
         }
         catch (Exception exception)
         {
-            RecordStartupFailure(exception);
+            StartupDiagnostics.Record(exception);
             throw;
         }
     }
 
     protected override void OnLaunched(LaunchActivatedEventArgs args)
     {
+        StartupDiagnostics.Trace("OnLaunched entered");
         try
         {
+            StartupDiagnostics.Trace("OnLaunched before MainWindow constructor");
             _window = new MainWindow();
+            StartupDiagnostics.Trace("OnLaunched after MainWindow constructor");
+            StartupDiagnostics.Trace("OnLaunched before Activate");
             _window.Activate();
+            StartupDiagnostics.Trace("OnLaunched after Activate");
         }
         catch (Exception exception)
         {
-            RecordStartupFailure(exception);
+            StartupDiagnostics.Record(exception);
             throw;
         }
     }
 
-    private static void RecordStartupFailure(Exception exception)
+    private static void App_UnhandledException(object sender, Microsoft.UI.Xaml.UnhandledExceptionEventArgs e)
     {
-        try
-        {
-            var directory = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                "ExecutionContinuity");
-            Directory.CreateDirectory(directory);
-            var details = new StringBuilder(exception.ToString());
-            foreach (var property in exception.GetType().GetProperties(BindingFlags.Instance | BindingFlags.Public))
-            {
-                if (property.GetIndexParameters().Length == 0 && property.Name is not "StackTrace")
-                {
-                    details.AppendLine();
-                    details.Append(property.Name);
-                    details.Append(": ");
-                    details.Append(property.GetValue(exception));
-                }
-            }
-
-            File.WriteAllText(Path.Combine(directory, "startup-error.txt"), details.ToString());
-        }
-        catch
-        {
-            // Startup diagnostics must never replace the original exception.
-        }
+        StartupDiagnostics.Record(e.Exception);
     }
 }

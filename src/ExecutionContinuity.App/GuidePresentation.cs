@@ -9,9 +9,10 @@ public enum GuideScreen
     Fallback,
     Blocked
 }
-
 public sealed record GuidePresentation(
     GuideScreen Screen,
+    string? RouteTitle,
+    string? StepProgress,
     string? Action,
     string? CompletionStandard,
     string? DoNotDo,
@@ -32,6 +33,8 @@ public sealed record GuidePresentation(
                 null,
                 null,
                 null,
+                null,
+                null,
                 CanCapture: true,
                 CanPause: false,
                 CanCompleteCurrentStep: false,
@@ -41,10 +44,14 @@ public sealed record GuidePresentation(
         }
 
         var step = state.Route(routeId).Steps.Single(candidate => candidate.Id == stepId);
+        var route = state.Route(routeId);
+        var stepProgress = $"{route.Steps.Count(candidate => candidate.IsCompleted) + 1}/{route.Steps.Count} 步";
         return state.Execution.Mode switch
         {
             ExecutionMode.Fallback => new(
                 GuideScreen.Fallback,
+                route.Title,
+                stepProgress,
                 step.FallbackAction,
                 null,
                 null,
@@ -56,6 +63,8 @@ public sealed record GuidePresentation(
                 CanReturnFromBlocked: false),
             ExecutionMode.Blocked => new(
                 GuideScreen.Blocked,
+                route.Title,
+                stepProgress,
                 null,
                 null,
                 null,
@@ -67,6 +76,8 @@ public sealed record GuidePresentation(
                 CanReturnFromBlocked: true),
             _ => new(
                 GuideScreen.CurrentAction,
+                route.Title,
+                stepProgress,
                 step.Action,
                 step.CompletionStandard,
                 step.DoNotDo,

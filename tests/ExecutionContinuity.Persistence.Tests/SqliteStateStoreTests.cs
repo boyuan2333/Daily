@@ -162,6 +162,49 @@ public sealed class SqliteStateStoreTests
         }
     }
 
+    [Fact]
+    public async Task Restored_archived_route_and_capture_survive_store_recreation_without_changing_execution_state()
+    {
+        var path = NewDatabasePath();
+        try
+        {
+            var activeRoute = Route.Create("Active", Step.Create("Active action", "Done", "Boundary"));
+            var archivedRoute = Route.Create("Archived", Step.Create("Archived action", "Archived done", "Archived boundary"));
+            var state = StateTransitions.SelectActiveRoute(AppState.Create(activeRoute, archivedRoute), activeRoute.Id);
+            state = StateTransitions.Pause(
+                state,
+                new DateTimeOffset(2026, 8, 9, 3, 55, 0, TimeSpan.FromHours(8)));
+            state = StateTransitions.ArchiveRoute(state, archivedRoute.Id);
+            state = StateTransitions.Capture(
+                state,
+                "archived raw idea",
+                new DateTimeOffset(2026, 8, 9, 3, 56, 0, TimeSpan.FromHours(8)));
+            var captureId = state.Captures.Single().Id;
+            state = StateTransitions.ArchiveCapture(state, captureId);
+            var archivedExecution = state.Execution;
+            var archivedSnapshots = state.Snapshots;
+
+            state = StateTransitions.RestoreArchivedRoute(state, archivedRoute.Id);
+            state = StateTransitions.RestoreArchivedCapture(state, captureId);
+
+            await new SqliteStateStore(path).SaveAsync(state);
+            var recovered = await new SqliteStateStore(path).LoadAsync();
+
+            Assert.Equal(archivedExecution, recovered.Execution);
+            Assert.Equal(archivedSnapshots, recovered.Snapshots);
+            Assert.Equal(RouteLifecycle.Draft, recovered.Route(archivedRoute.Id).Lifecycle);
+            Assert.Equal("Archived", recovered.Route(archivedRoute.Id).Title);
+            var capture = Assert.Single(recovered.Captures);
+            Assert.False(capture.IsArchived);
+            Assert.Equal("archived raw idea", capture.RawText);
+            Assert.Equal(new DateTimeOffset(2026, 8, 9, 3, 56, 0, TimeSpan.FromHours(8)), capture.CapturedAt);
+        }
+        finally
+        {
+            DeleteDatabase(path);
+        }
+    }
+
     private static string NewDatabasePath() =>
         Path.Combine(Path.GetTempPath(), $"execution-continuity-{Guid.NewGuid():N}.db");
 

@@ -39,6 +39,8 @@ public sealed record Route(
     IReadOnlyList<Step> Steps,
     RouteLifecycle Lifecycle)
 {
+    public RouteLifecycle? LifecycleBeforeArchive { get; init; }
+
     public static Route Create(string title, params Step[] steps) =>
         new(
             Guid.NewGuid(),
@@ -274,9 +276,44 @@ public static class StateTransitions
             throw new InvalidOperationException("The active route cannot be archived.");
         }
 
+        var target = state.Route(routeId);
+        if (target.Lifecycle == RouteLifecycle.Archived)
+        {
+            throw new InvalidOperationException("The route is already archived.");
+        }
+
         return state.With(
             state.Routes.Select(route => route.Id == routeId
-                ? route with { Lifecycle = RouteLifecycle.Archived }
+                ? route with
+                {
+                    Lifecycle = RouteLifecycle.Archived,
+                    LifecycleBeforeArchive = route.Lifecycle
+                }
+                : route).ToArray(),
+            state.Execution);
+    }
+
+    public static AppState RestoreArchivedRoute(AppState state, Guid routeId)
+    {
+        var target = state.Route(routeId);
+        if (target.Lifecycle != RouteLifecycle.Archived)
+        {
+            throw new InvalidOperationException("Only an archived route can be restored.");
+        }
+
+        var restoredLifecycle = target.LifecycleBeforeArchive ?? RouteLifecycle.Draft;
+        if (restoredLifecycle == RouteLifecycle.Active)
+        {
+            restoredLifecycle = RouteLifecycle.Paused;
+        }
+
+        return state.With(
+            state.Routes.Select(route => route.Id == routeId
+                ? route with
+                {
+                    Lifecycle = restoredLifecycle,
+                    LifecycleBeforeArchive = null
+                }
                 : route).ToArray(),
             state.Execution);
     }
@@ -293,6 +330,22 @@ public static class StateTransitions
             state.Execution,
             captures: state.Captures.Select(capture => capture.Id == captureId
                 ? capture with { IsArchived = true }
+                : capture).ToArray());
+    }
+
+    public static AppState RestoreArchivedCapture(AppState state, Guid captureId)
+    {
+        var target = state.Captures.SingleOrDefault(capture => capture.Id == captureId);
+        if (target is null || !target.IsArchived)
+        {
+            throw new InvalidOperationException("Only an archived capture can be restored.");
+        }
+
+        return state.With(
+            state.Routes,
+            state.Execution,
+            captures: state.Captures.Select(capture => capture.Id == captureId
+                ? capture with { IsArchived = false }
                 : capture).ToArray());
     }
 

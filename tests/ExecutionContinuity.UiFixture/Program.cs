@@ -100,8 +100,14 @@ static async Task CreateFixtureAsync(string databasePath)
             "Review the paused route context",
             "The retained context is understood",
             "Do not change the route while reviewing it"));
+    var archivedRoute = Route.Create(
+        "UI-002 archived route",
+        Step.Create(
+            "Restore this archived route from Archive",
+            "The route appears in the Routes list again",
+            "Do not activate the route while restoring it"));
 
-    var routes = new List<Route> { currentRoute, pausedRoute };
+    var routes = new List<Route> { currentRoute, pausedRoute, archivedRoute };
     for (var index = 1; index <= 8; index++)
     {
         routes.Add(Route.Create(
@@ -123,6 +129,7 @@ static async Task CreateFixtureAsync(string databasePath)
         state,
         currentRoute.Id,
         new DateTimeOffset(2026, 8, 5, 1, 1, 0, TimeSpan.FromHours(8)));
+    state = StateTransitions.ArchiveRoute(state, archivedRoute.Id);
     state = StateTransitions.Capture(
         state,
         "UI-004 Inbox detail fixture",
@@ -134,6 +141,11 @@ static async Task CreateFixtureAsync(string databasePath)
             $"UI-004 Inbox fixture entry {index:00}",
             new DateTimeOffset(2026, 8, 5, 1, 2 + index, 0, TimeSpan.FromHours(8)));
     }
+    state = StateTransitions.Capture(
+        state,
+        "UI-002 archived Inbox fixture entry",
+        new DateTimeOffset(2026, 8, 5, 1, 30, 0, TimeSpan.FromHours(8)));
+    state = StateTransitions.ArchiveCapture(state, state.Captures.Last().Id);
 
     await new SqliteStateStore(databasePath).SaveAsync(state);
 }

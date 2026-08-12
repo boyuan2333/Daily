@@ -136,7 +136,9 @@ public sealed partial class MainWindow : Window
         SetSelected(ArchiveNavButton, _planningDestination == PlanningDestination.Archive);
         RenderDraftSteps();
         RouteListPanel.Children.Clear();
-        foreach (var route in _session.State.Routes.OrderBy(route => route.Title))
+        foreach (var route in _session.State.Routes
+            .Where(route => route.Lifecycle != RouteLifecycle.Archived)
+            .OrderBy(route => route.Title))
         {
             var line = new StackPanel { Spacing = 4 };
             line.Children.Add(new TextBlock { Text = route.Title, Style = (Style)Application.Current.Resources["BodyStrongTextBlockStyle"] });
@@ -151,14 +153,11 @@ public sealed partial class MainWindow : Window
                 line.Children.Add(activate);
             }
 
-            if (route.Lifecycle != RouteLifecycle.Archived)
-            {
-                var edit = new Button { Content = "编辑路线", Tag = route.Id.ToString(), HorizontalAlignment = HorizontalAlignment.Left };
-                edit.Click += EditRouteButton_Click;
-                line.Children.Add(edit);
-            }
+            var edit = new Button { Content = "编辑路线", Tag = route.Id.ToString(), HorizontalAlignment = HorizontalAlignment.Left };
+            edit.Click += EditRouteButton_Click;
+            line.Children.Add(edit);
 
-            if (route.Id != _session.State.Execution.ActiveRouteId && route.Lifecycle != RouteLifecycle.Archived)
+            if (route.Id != _session.State.Execution.ActiveRouteId)
             {
                 var archive = new Button { Content = "归档路线", Tag = route.Id.ToString(), HorizontalAlignment = HorizontalAlignment.Left };
                 archive.Click += ArchiveRouteButton_Click;
@@ -168,7 +167,7 @@ public sealed partial class MainWindow : Window
             RouteListPanel.Children.Add(line);
         }
 
-        if (_session.State.Routes.Count == 0)
+        if (_session.State.Routes.All(route => route.Lifecycle == RouteLifecycle.Archived))
         {
             RouteListPanel.Children.Add(new TextBlock { Text = "尚无路线。", Opacity = 0.68 });
         }
@@ -214,7 +213,55 @@ public sealed partial class MainWindow : Window
         }
 
         RenderInboxDetail(visibleCaptures.SingleOrDefault(capture => capture.Id == _responsivePlanning.Inbox.SelectedItemId));
+        RenderArchive();
         UpdatePlanningLayout(PlanningPanel.ActualWidth);
+    }
+
+    private void RenderArchive()
+    {
+        ArchivedRoutesPanel.Children.Clear();
+        var archivedRoutes = _session.State.Routes
+            .Where(route => route.Lifecycle == RouteLifecycle.Archived)
+            .OrderBy(route => route.Title)
+            .ToArray();
+        foreach (var route in archivedRoutes)
+        {
+            var line = new StackPanel { Spacing = 5 };
+            line.Children.Add(new TextBlock { Text = route.Title, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold, TextWrapping = TextWrapping.Wrap });
+            line.Children.Add(new TextBlock { Text = $"下一动作：{route.CurrentStep()?.Action ?? "没有未完成的动作"}", Opacity = 0.72, TextWrapping = TextWrapping.Wrap });
+            line.Children.Add(new TextBlock { Text = $"恢复后状态：{LifecycleText(route.LifecycleBeforeArchive ?? RouteLifecycle.Draft)}", Opacity = 0.62 });
+            var restore = new Button { Content = "恢复路线", Tag = route.Id.ToString(), HorizontalAlignment = HorizontalAlignment.Left };
+            restore.Click += RestoreArchivedRouteButton_Click;
+            line.Children.Add(restore);
+            ArchivedRoutesPanel.Children.Add(line);
+        }
+
+        if (archivedRoutes.Length == 0)
+        {
+            ArchivedRoutesPanel.Children.Add(new TextBlock { Text = "没有已归档路线。", Opacity = 0.68 });
+        }
+
+        ArchivedCapturesPanel.Children.Clear();
+        var archivedCaptures = _session.State.Captures
+            .Where(capture => capture.IsArchived)
+            .OrderByDescending(capture => capture.CapturedAt)
+            .ToArray();
+        foreach (var capture in archivedCaptures)
+        {
+            var line = new StackPanel { Spacing = 5 };
+            var preview = capture.RawText.Length > 100 ? $"{capture.RawText[..100]}..." : capture.RawText;
+            line.Children.Add(new TextBlock { Text = preview, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold, TextWrapping = TextWrapping.Wrap });
+            line.Children.Add(new TextBlock { Text = $"捕捉时间：{capture.CapturedAt.LocalDateTime:g}", Opacity = 0.62 });
+            var restore = new Button { Content = "恢复想法", Tag = capture.Id.ToString(), HorizontalAlignment = HorizontalAlignment.Left };
+            restore.Click += RestoreArchivedCaptureButton_Click;
+            line.Children.Add(restore);
+            ArchivedCapturesPanel.Children.Add(line);
+        }
+
+        if (archivedCaptures.Length == 0)
+        {
+            ArchivedCapturesPanel.Children.Add(new TextBlock { Text = "没有已归档收件箱条目。", Opacity = 0.68 });
+        }
     }
 
     private void RenderInboxDetail(CaptureEntry? capture)
@@ -660,6 +707,14 @@ public sealed partial class MainWindow : Window
         }
     }
 
+    private async void RestoreArchivedRouteButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (TryReadTag(sender, out var routeId))
+        {
+            await RunAsync(() => _session.RestoreArchivedRouteAsync(routeId), "路线已恢复。");
+        }
+    }
+
     private void ConvertCaptureButton_Click(object sender, RoutedEventArgs e)
     {
         if (!TryReadTag(sender, out var captureId))
@@ -686,6 +741,14 @@ public sealed partial class MainWindow : Window
         if (TryReadTag(sender, out var captureId))
         {
             await RunAsync(() => _session.ArchiveCaptureAsync(captureId), "想法已归档。");
+        }
+    }
+
+    private async void RestoreArchivedCaptureButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (TryReadTag(sender, out var captureId))
+        {
+            await RunAsync(() => _session.RestoreArchivedCaptureAsync(captureId), "想法已恢复。");
         }
     }
 

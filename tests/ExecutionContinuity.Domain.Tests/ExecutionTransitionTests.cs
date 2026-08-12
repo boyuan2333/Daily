@@ -93,4 +93,45 @@ public sealed class ExecutionTransitionTests
         Assert.Equal(state.Execution.CurrentStepId, returned.Execution.CurrentStepId);
         Assert.False(returned.Route(route.Id).Steps.Single().IsCompleted);
     }
+
+    [Fact]
+    public void Restoring_an_archived_route_only_changes_its_lifecycle()
+    {
+        var activeRoute = Route.Create("Active", Step.Create("Active action", "Done", "Boundary"));
+        var archivedRoute = Route.Create("Archived", Step.Create("Archived action", "Archived done", "Archived boundary"));
+        var state = StateTransitions.SelectActiveRoute(AppState.Create(activeRoute, archivedRoute), activeRoute.Id);
+        state = StateTransitions.ArchiveRoute(state, archivedRoute.Id);
+        var beforeRestore = state;
+
+        var restored = StateTransitions.RestoreArchivedRoute(state, archivedRoute.Id);
+
+        Assert.Equal(RouteLifecycle.Draft, restored.Route(archivedRoute.Id).Lifecycle);
+        Assert.Equal(beforeRestore.Execution, restored.Execution);
+        Assert.Equal(beforeRestore.Snapshots, restored.Snapshots);
+        Assert.Equal(beforeRestore.Route(archivedRoute.Id).Steps, restored.Route(archivedRoute.Id).Steps);
+        Assert.Equal(RouteLifecycle.Active, restored.Route(activeRoute.Id).Lifecycle);
+        restored.ValidateInvariants();
+    }
+
+    [Fact]
+    public void Restoring_an_archived_capture_only_clears_the_archive_flag()
+    {
+        var route = Route.Create("Route", Step.Create("Action", "Done", "Boundary"));
+        var capturedAt = new DateTimeOffset(2026, 8, 9, 3, 50, 0, TimeSpan.FromHours(8));
+        var state = StateTransitions.SelectActiveRoute(AppState.Create(route), route.Id);
+        state = StateTransitions.Capture(state, "raw archived thought", capturedAt);
+        var captureId = state.Captures.Single().Id;
+        state = StateTransitions.ArchiveCapture(state, captureId);
+        var beforeRestore = state;
+
+        var restored = StateTransitions.RestoreArchivedCapture(state, captureId);
+
+        var capture = Assert.Single(restored.Captures);
+        Assert.False(capture.IsArchived);
+        Assert.Equal("raw archived thought", capture.RawText);
+        Assert.Equal(capturedAt, capture.CapturedAt);
+        Assert.Equal(beforeRestore.Execution, restored.Execution);
+        Assert.Equal(beforeRestore.Routes, restored.Routes);
+        Assert.Equal(beforeRestore.Snapshots, restored.Snapshots);
+    }
 }

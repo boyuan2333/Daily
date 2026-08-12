@@ -65,8 +65,14 @@ public sealed class ExecutionSession
     public Task ArchiveRouteAsync(Guid routeId, CancellationToken cancellationToken = default) =>
         CommitAsync(state => StateTransitions.ArchiveRoute(state, routeId), cancellationToken);
 
+    public Task RestoreArchivedRouteAsync(Guid routeId, CancellationToken cancellationToken = default) =>
+        CommitAsync(state => StateTransitions.RestoreArchivedRoute(state, routeId), cancellationToken);
+
     public Task ArchiveCaptureAsync(Guid captureId, CancellationToken cancellationToken = default) =>
         CommitAsync(state => StateTransitions.ArchiveCapture(state, captureId), cancellationToken);
+
+    public Task RestoreArchivedCaptureAsync(Guid captureId, CancellationToken cancellationToken = default) =>
+        CommitAsync(state => StateTransitions.RestoreArchivedCapture(state, captureId), cancellationToken);
 
     public Task ConvertCaptureToRouteAsync(
         Guid captureId,

@@ -117,9 +117,9 @@
 
 ## UI-002：为归档内容提供可逆恢复界面
 
-- **状态：** 待认领
-- **认领者：**
-- **认领时间：**
+- **状态：** 进行中
+- **认领者：** Symphony Worker BOY-11 Codex
+- **认领时间：** 2026-08-09 03:42 HKT
 - **体量：** 大
 - **风险：** 高
 - **推荐等级：** C
@@ -144,7 +144,12 @@
 
 ### 结果
 
-待填写。
+- 状态：进行中，等待 Windows/.NET WinUI runner 完成验证后再移交 In Review。
+- 已实现范围：领域层新增 archived route/capture 恢复转换；路线恢复记录并使用归档前生命周期，且不会恢复为 active；Inbox 恢复只清除 `IsArchived`。应用会话新增恢复命令。规划模式 Archive 页面显示「已归档路线」和「已归档收件箱条目」两个列表，并提供「恢复路线」「恢复想法」。普通 Routes/Inbox 列表排除归档内容。UI fixture 增加 UI-002 归档路线和归档 Inbox 条目。
+- 自动化覆盖：新增领域测试覆盖恢复路线只改变生命周期、恢复 Inbox 只清除归档标记；新增持久化测试覆盖恢复后重建 store 仍保留执行状态、快照、原始内容和时间戳；新增应用层失败测试覆盖提交失败时内存与持久化状态保持归档；新增静态 UI 契约测试覆盖 Archive 恢复面板和普通列表排除归档内容。
+- 已运行验证：`/tmp/dotnet/dotnet restore ExecutionContinuity.slnx /p:EnableWindowsTargeting=true` 通过；`/tmp/dotnet/dotnet test tests/ExecutionContinuity.Domain.Tests/ExecutionContinuity.Domain.Tests.csproj --no-restore --filter "FullyQualifiedName~Restoring_an_archived" --verbosity minimal` 通过，2/2；`/tmp/dotnet/dotnet test tests/ExecutionContinuity.Domain.Tests/ExecutionContinuity.Domain.Tests.csproj --no-restore --verbosity minimal` 通过，24/24；`/tmp/dotnet/dotnet build src/ExecutionContinuity.Persistence/ExecutionContinuity.Persistence.csproj --no-restore --verbosity minimal` 通过，0 警告、0 错误；`git diff --check` 通过。
+- 阻塞验证：本 worker 是 Ubuntu 24.04 环境，初始无 `dotnet`、无 `pwsh`、无 `cmd.exe`；临时安装 Linux .NET 10 SDK 后，持久化测试运行失败于 `winsqlite3` 缺失，这是项目已确认的 Windows SQLite provider；App 测试和完整 solution build 失败于 Windows App SDK `XamlCompiler.exe`，需要 Windows runner。失败命令：`/tmp/dotnet/dotnet test tests/ExecutionContinuity.Persistence.Tests/ExecutionContinuity.Persistence.Tests.csproj --no-restore --filter "FullyQualifiedName~Restored_archived" --verbosity minimal`；`/tmp/dotnet/dotnet test tests/ExecutionContinuity.App.Tests/ExecutionContinuity.App.Tests.csproj --no-restore /p:EnableWindowsTargeting=true --filter "FullyQualifiedName~Archive_workspace|FullyQualifiedName~Normal_planning_lists" --verbosity minimal`；`/tmp/dotnet/dotnet build ExecutionContinuity.slnx --no-restore /p:EnableWindowsTargeting=true --verbosity minimal`，最后一项为 0 警告、1 错误，错误来自 WinUI XAML compiler。
+- 待运行：在 Windows runner 上执行 `dotnet build ExecutionContinuity.slnx --no-restore --verbosity minimal`、`dotnet test ExecutionContinuity.slnx --no-build --verbosity minimal`、`dotnet build tests\ExecutionContinuity.UiFixture\ExecutionContinuity.UiFixture.csproj --no-restore --verbosity minimal`，再用隔离 fixture 执行 Manual Acceptance 中的 `Archive restore` 与 `Archive restore write failure`。默认 LocalAppData 数据库不得用于自动验收。
 
 ## UI-003：锁定 Capture 抽屉的原始上下文
 

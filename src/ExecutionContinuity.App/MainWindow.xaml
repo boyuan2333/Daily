@@ -187,11 +187,16 @@
                                                 <TextBox x:Name="FallbackActionInput" Background="Transparent" BorderThickness="0" Padding="14,10" FontFamily="Microsoft YaHei UI" FontSize="15" PlaceholderText="可选的预设备选动作" AcceptsReturn="True" TextWrapping="Wrap" />
                                             </Border>
                                             <StackPanel Orientation="Horizontal" Spacing="10">
-                                                <Button x:Name="AddStepButton" Content="添加步骤" Click="AddStepButton_Click" Background="#FFFFFF" Foreground="#202521" BorderBrush="#D8DED7" BorderThickness="1" Padding="16,10" MinHeight="42" />
-                                                <Button Content="清空步骤" Click="ClearStepButton_Click" Background="Transparent" BorderBrush="Transparent" Padding="17,8" MinHeight="36" />
+                                                <Button x:Name="AddStepButton" Click="AddStepButton_Click" Style="{StaticResource PlanningSecondaryButtonStyle}">
+                                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                                        <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE710;" FontSize="14" />
+                                                        <TextBlock Text="添加步骤" />
+                                                    </StackPanel>
+                                                </Button>
+                                                <Button Content="清空步骤" Click="ClearStepButton_Click" Style="{StaticResource PlanningDestructiveButtonStyle}" />
                                             </StackPanel>
                                             <StackPanel x:Name="DraftStepsPanel" Spacing="6" />
-                                            <Button x:Name="SaveRouteButton" Content="保存草稿路线" Click="CreateRouteButton_Click" Background="#4A845E" Foreground="White" BorderBrush="#4A845E" Padding="18,10" MinHeight="42" HorizontalAlignment="Left" />
+                                            <Button x:Name="SaveRouteButton" Content="保存草稿路线" Click="CreateRouteButton_Click" Style="{StaticResource PlanningPrimaryButtonStyle}" HorizontalAlignment="Left" />
                                         </StackPanel>
                                     </Border>
                                 </StackPanel>

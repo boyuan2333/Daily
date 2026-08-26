@@ -428,6 +428,30 @@ public sealed class ExecutionSessionTests
     }
 
     [Fact]
+    public void Planning_route_editor_distinguishes_primary_secondary_and_destructive_step_actions()
+    {
+        var root = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", ".."));
+        var xaml = File.ReadAllText(Path.Combine(root, "src", "ExecutionContinuity.App", "MainWindow.xaml"));
+        var resources = File.ReadAllText(Path.Combine(root, "src", "ExecutionContinuity.App", "App.xaml"));
+        var code = File.ReadAllText(Path.Combine(root, "src", "ExecutionContinuity.App", "MainWindow.xaml.cs"));
+
+        Assert.Contains("Style=\"{StaticResource PlanningSecondaryButtonStyle}\"", xaml);
+        Assert.Contains("Style=\"{StaticResource PlanningDestructiveButtonStyle}\"", xaml);
+        Assert.Contains("Style=\"{StaticResource PlanningPrimaryButtonStyle}\"", xaml);
+        Assert.Contains("Glyph=\"&#xE710;\"", xaml);
+        Assert.Contains("ClearStepButton_Click", xaml);
+        Assert.Contains("ShowClearStepConfirmation", code);
+        Assert.Contains("x:Key=\"PlanningPrimaryButtonStyle\"", resources);
+        Assert.Contains("x:Key=\"PlanningSecondaryButtonStyle\"", resources);
+        Assert.Contains("x:Key=\"PlanningDestructiveButtonStyle\"", resources);
+        Assert.Contains("PointerOver", resources);
+        Assert.Contains("#427A56", resources);
+        Assert.Contains("#386A49", resources);
+        Assert.Contains("FocusRing", resources);
+        Assert.DoesNotContain("#FFFFFF\" />\n                            </VisualState.Setters>", resources);
+    }
+
+    [Fact]
     public void Guide_presentation_exposes_only_the_commands_allowed_by_the_execution_mode()
     {
         var fallbackRoute = Route.Create("Fallback", Step.Create("Action", "Done", "Boundary", "Fallback action"));

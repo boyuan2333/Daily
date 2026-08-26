@@ -581,7 +581,39 @@ public sealed partial class MainWindow : Window
         UpdatePlanningLayout(PlanningPanel.ActualWidth);
     }
 
-    private void ClearStepButton_Click(object sender, RoutedEventArgs e) => ClearStepEditor();
+    private async void ClearStepButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_draftSteps.Count == 0 &&
+            string.IsNullOrWhiteSpace(RouteActionInput.Text) &&
+            string.IsNullOrWhiteSpace(CompletionStandardInput.Text) &&
+            string.IsNullOrWhiteSpace(DoNotDoInput.Text) &&
+            string.IsNullOrWhiteSpace(FallbackActionInput.Text))
+        {
+            return;
+        }
+
+        await ShowClearStepConfirmation();
+    }
+
+    private async Task ShowClearStepConfirmation()
+    {
+        var dialog = new ContentDialog
+        {
+            Title = "清空当前步骤？",
+            Content = "这会清除当前正在编辑的步骤内容和未保存的草稿步骤。已保存的路线不会改变。",
+            PrimaryButtonText = "清空步骤",
+            CloseButtonText = "取消",
+            DefaultButton = ContentDialogButton.Close,
+            XamlRoot = RootGrid.XamlRoot
+        };
+
+        if (await dialog.ShowAsync() == ContentDialogResult.Primary)
+        {
+            ClearStepEditor();
+            _draftSteps.Clear();
+            RenderPlanning();
+        }
+    }
 
     private void EditDraftStepButton_Click(object sender, RoutedEventArgs e)
     {

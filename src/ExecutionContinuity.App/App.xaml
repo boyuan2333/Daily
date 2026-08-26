@@ -5,5 +5,81 @@
     xmlns:controls="using:Microsoft.UI.Xaml.Controls">
     <Application.Resources>
         <controls:XamlControlsResources />
+
+        <Style x:Key="PlanningPrimaryButtonStyle" TargetType="Button">
+            <Setter Property="Background" Value="#4F8F65" />
+            <Setter Property="Foreground" Value="#FFFFFF" />
+            <Setter Property="BorderBrush" Value="#4F8F65" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Padding" Value="18,10" />
+            <Setter Property="MinHeight" Value="42" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+            <Setter Property="Resources">
+                <Setter.Value>
+                    <ResourceDictionary>
+                        <SolidColorBrush x:Key="ButtonBackgroundPointerOver">#427A56</SolidColorBrush>
+                        <SolidColorBrush x:Key="ButtonForegroundPointerOver">#FFFFFF</SolidColorBrush>
+                        <SolidColorBrush x:Key="ButtonBorderBrushPointerOver">#427A56</SolidColorBrush>
+                        <SolidColorBrush x:Key="ButtonBackgroundPressed">#386A49</SolidColorBrush>
+                        <SolidColorBrush x:Key="ButtonForegroundPressed">#FFFFFF</SolidColorBrush>
+                        <SolidColorBrush x:Key="ButtonBorderBrushPressed">#386A49</SolidColorBrush>
+                        <SolidColorBrush x:Key="ButtonBackgroundDisabled">#A8BDAE</SolidColorBrush>
+                        <SolidColorBrush x:Key="ButtonForegroundDisabled">#EAF1EC</SolidColorBrush>
+                        <SolidColorBrush x:Key="ButtonBorderBrushDisabled">#A8BDAE</SolidColorBrush>
+                        <SolidColorBrush x:Key="ButtonBorderBrushFocused">#4F8F65</SolidColorBrush>
+                        <SolidColorBrush x:Key="FocusRing">#4F8F65</SolidColorBrush>
+                        <SolidColorBrush x:Key="FocusVisualPrimaryBrush">#4F8F65</SolidColorBrush>
+                        <SolidColorBrush x:Key="FocusVisualSecondaryBrush">#FFFFFF</SolidColorBrush>
+                    </ResourceDictionary>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="PlanningSecondaryButtonStyle" TargetType="Button">
+            <Setter Property="Background" Value="#FFFFFF" />
+            <Setter Property="Foreground" Value="#202521" />
+            <Setter Property="BorderBrush" Value="#D8DED7" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Padding" Value="16,10" />
+            <Setter Property="MinHeight" Value="42" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+            <Setter Property="Resources">
+                <Setter.Value>
+                    <ResourceDictionary>
+                        <SolidColorBrush x:Key="ButtonBackgroundPointerOver">#F3F7F3</SolidColorBrush>
+                        <SolidColorBrush x:Key="ButtonForegroundPointerOver">#202521</SolidColorBrush>
+                        <SolidColorBrush x:Key="ButtonBorderBrushPointerOver">#4F8F65</SolidColorBrush>
+                        <SolidColorBrush x:Key="ButtonBackgroundPressed">#E8F0EA</SolidColorBrush>
+                        <SolidColorBrush x:Key="ButtonForegroundPressed">#202521</SolidColorBrush>
+                        <SolidColorBrush x:Key="ButtonBorderBrushPressed">#427A56</SolidColorBrush>
+                    </ResourceDictionary>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="PlanningDestructiveButtonStyle" TargetType="Button">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Foreground" Value="#A13B31" />
+            <Setter Property="BorderBrush" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Padding" Value="12,8" />
+            <Setter Property="MinHeight" Value="42" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+            <Setter Property="Resources">
+                <Setter.Value>
+                    <ResourceDictionary>
+                        <SolidColorBrush x:Key="ButtonBackgroundPointerOver">#FFF3F1</SolidColorBrush>
+                        <SolidColorBrush x:Key="ButtonForegroundPointerOver">#8C2F28</SolidColorBrush>
+                        <SolidColorBrush x:Key="ButtonBorderBrushPointerOver">#E5B7B0</SolidColorBrush>
+                        <SolidColorBrush x:Key="ButtonBackgroundPressed">#FBE2DE</SolidColorBrush>
+                        <SolidColorBrush x:Key="ButtonForegroundPressed">#76251F</SolidColorBrush>
+                        <SolidColorBrush x:Key="ButtonBorderBrushPressed">#D9988E</SolidColorBrush>
+                    </ResourceDictionary>
+                </Setter.Value>
+            </Setter>
+        </Style>
     </Application.Resources>
 </Application>

@@ -2,6 +2,7 @@ using ExecutionContinuity.App;
 using ExecutionContinuity.Domain;
 using ExecutionContinuity.Persistence;
 using System.Reflection;
+using System.Xml.Linq;
 using Xunit;
 
 namespace ExecutionContinuity.App.Tests;
@@ -312,6 +313,7 @@ public sealed class ExecutionSessionTests
             "..", "..", "..", "..", "..",
             "src", "ExecutionContinuity.App", "MainWindow.xaml"));
         var xaml = File.ReadAllText(xamlPath);
+        var normalizedXaml = xaml.ReplaceLineEndings("\n");
         var codePath = Path.GetFullPath(Path.Combine(
             AppContext.BaseDirectory,
             "..", "..", "..", "..", "..",
@@ -320,7 +322,7 @@ public sealed class ExecutionSessionTests
 
         Assert.Contains("x:Name=\"ModeSelectionIndicator\"", xaml);
         Assert.Contains("<Border Grid.Column=\"1\" Background=\"#F0F3EE\" CornerRadius=\"18\"", xaml);
-        Assert.Contains("x:Name=\"ModeSelectionIndicator\"\n                            Width=\"100\"\n                            Background=\"#4A845E\"\n                            CornerRadius=\"18\"", xaml);
+        Assert.Contains("x:Name=\"ModeSelectionIndicator\"\n                            Width=\"100\"\n                            Background=\"#4A845E\"\n                            CornerRadius=\"18\"", normalizedXaml);
         Assert.Contains("x:Name=\"ModeSelectionTransform\"", xaml);
         Assert.Contains("TimeSpan.FromMilliseconds(300)", code);
         Assert.Contains("Storyboard.SetTargetProperty(animation, \"X\")", code);
@@ -432,12 +434,31 @@ public sealed class ExecutionSessionTests
     {
         var root = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", ".."));
         var xaml = File.ReadAllText(Path.Combine(root, "src", "ExecutionContinuity.App", "MainWindow.xaml"));
-        var resources = File.ReadAllText(Path.Combine(root, "src", "ExecutionContinuity.App", "App.xaml"));
+        var resourcesPath = Path.Combine(root, "src", "ExecutionContinuity.App", "App.xaml");
+        var resources = File.ReadAllText(resourcesPath);
         var code = File.ReadAllText(Path.Combine(root, "src", "ExecutionContinuity.App", "MainWindow.xaml.cs"));
+        var document = XDocument.Load(resourcesPath);
+        XNamespace presentation = "http://schemas.microsoft.com/winfx/2006/xaml/presentation";
+        XNamespace xamlNamespace = "http://schemas.microsoft.com/winfx/2006/xaml";
+        XNamespace controls = "using:Microsoft.UI.Xaml.Controls";
+
+        var applicationResources = Assert.Single(document.Root!.Elements(presentation + "Application.Resources"));
+        var resourceDictionary = Assert.Single(applicationResources.Elements(presentation + "ResourceDictionary"));
+        var mergedDictionaries = Assert.Single(resourceDictionary.Elements(presentation + "ResourceDictionary.MergedDictionaries"));
+        Assert.Single(mergedDictionaries.Elements(controls + "XamlControlsResources"));
+        Assert.Equal(
+            ["PlanningDestructiveButtonStyle", "PlanningPrimaryButtonStyle", "PlanningSecondaryButtonStyle"],
+            resourceDictionary.Elements(presentation + "Style")
+                .Select(style => (string)style.Attribute(xamlNamespace + "Key")!)
+                .OrderBy(key => key)
+                .ToArray());
 
         Assert.Contains("Style=\"{StaticResource PlanningSecondaryButtonStyle}\"", xaml);
         Assert.Contains("Style=\"{StaticResource PlanningDestructiveButtonStyle}\"", xaml);
         Assert.Contains("Style=\"{StaticResource PlanningPrimaryButtonStyle}\"", xaml);
+        Assert.Contains("Resources=\"{StaticResource PlanningSecondaryButtonResources}\"", xaml);
+        Assert.Contains("Resources=\"{StaticResource PlanningDestructiveButtonResources}\"", xaml);
+        Assert.Contains("Resources=\"{StaticResource PlanningPrimaryButtonResources}\"", xaml);
         Assert.Contains("Glyph=\"&#xE710;\"", xaml);
         Assert.Contains("ClearStepButton_Click", xaml);
         Assert.Contains("ShowClearStepConfirmation", code);

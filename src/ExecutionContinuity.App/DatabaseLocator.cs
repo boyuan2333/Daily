@@ -3,6 +3,7 @@ namespace ExecutionContinuity.App;
 public static class DatabaseLocator
 {
     public const string OverrideEnvironmentVariable = "EXECUTION_CONTINUITY_DATABASE";
+    public const string FailSaveEnvironmentVariable = "EXECUTION_CONTINUITY_FAIL_SAVE";
 
     public static string Resolve(string? explicitPath = null)
     {

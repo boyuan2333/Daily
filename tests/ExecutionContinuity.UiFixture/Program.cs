@@ -2,23 +2,39 @@ using System.Diagnostics;
 using ExecutionContinuity.Domain;
 using ExecutionContinuity.Persistence;
 
+var reuseExisting = args.Length == 1 && string.Equals(args[0], "--reuse", StringComparison.OrdinalIgnoreCase);
+
 if (args.Length > 1)
 {
-    Console.Error.WriteLine("Usage: ExecutionContinuity.UiFixture [database-path]");
+    Console.Error.WriteLine("Usage: ExecutionContinuity.UiFixture [database-path | --reuse]");
     return 2;
 }
 
 try
 {
     var repositoryRoot = FindRepositoryRoot(AppContext.BaseDirectory);
-    var databasePath = Path.GetFullPath(args.Length == 1
+    var databasePath = Path.GetFullPath(reuseExisting
+        ? Path.Combine(repositoryRoot, ".ui-review", "ui004-fixture", "execution-continuity.db")
+        : args.Length == 1
         ? args[0]
         : Path.Combine(repositoryRoot, ".ui-review", "ui004-fixture", "execution-continuity.db"));
 
-    await CreateFixtureAsync(databasePath);
-    Console.WriteLine($"Fixture created: {databasePath}");
+    if (reuseExisting)
+    {
+        if (!File.Exists(databasePath))
+        {
+            throw new FileNotFoundException("Cannot reuse a fixture database that does not exist.", databasePath);
+        }
 
-    if (args.Length == 1)
+        Console.WriteLine($"Reusing fixture: {databasePath}");
+    }
+    else
+    {
+        await CreateFixtureAsync(databasePath);
+        Console.WriteLine($"Fixture created: {databasePath}");
+    }
+
+    if (args.Length == 1 && !reuseExisting)
     {
         return 0;
     }

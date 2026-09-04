@@ -37,3 +37,8 @@ Guide mode is an interaction mode the user enters explicitly or the application 
 - Keep technical choices documented as confirmed, proposed, or open. Do not convert candidates into facts without an explicit decision.
 - Do not create application code in this documentation phase.
 - Before implementation, read the approved product specification, acceptance criteria, and implementation plan. Map every testable acceptance criterion to automated coverage or a manual acceptance script. Do not claim implementation completion without actual test and build evidence.
+
+## Agent Collaboration
+
+- Follow `docs/AGENT_COLLABORATION_PLAYBOOK.md` for prompts, handoffs, same-workspace coordination, independent worktrees, and cross-computer work.
+- Treat the playbook as an operational protocol; treat `PRODUCT_SPEC.md`, `ACCEPTANCE.md`, and `IMPLEMENTATION_PLAN.md` as the product and delivery authorities.

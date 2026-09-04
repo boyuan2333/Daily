@@ -49,7 +49,21 @@ public sealed partial class MainWindow : Window
         StartupDiagnostics.Trace("MainWindow constructor before DatabaseLocator.Resolve");
         var databasePath = DatabaseLocator.Resolve();
         StartupDiagnostics.Trace("MainWindow constructor after DatabaseLocator.Resolve");
-        _session = new ExecutionSession(new SqliteStateStore(databasePath));
+        IStateStore store = new SqliteStateStore(databasePath);
+        if (string.Equals(
+                Environment.GetEnvironmentVariable(DatabaseLocator.FailSaveEnvironmentVariable),
+                "1",
+                StringComparison.OrdinalIgnoreCase)
+            || string.Equals(
+                Environment.GetEnvironmentVariable(DatabaseLocator.FailSaveEnvironmentVariable),
+                "true",
+                StringComparison.OrdinalIgnoreCase))
+        {
+            store = new FailSaveStateStore(store);
+        }
+
+        StartupDiagnostics.Trace($"State store={store.GetType().Name}");
+        _session = new ExecutionSession(store);
         Activated += MainWindow_Activated;
         StartupDiagnostics.Trace("MainWindow constructor completed");
     }
@@ -287,13 +301,59 @@ public sealed partial class MainWindow : Window
             Child = new TextBlock { Text = capture.RawText, TextWrapping = TextWrapping.Wrap, FontSize = 18 }
         };
         InboxDetailPanel.Children.Add(original);
-        var actions = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 10, Margin = new Thickness(0, 10, 0, 0) };
-        var convert = new Button { Content = "转换为草稿路线", Tag = capture.Id.ToString() };
+        var actions = new StackPanel { Spacing = 12, Margin = new Thickness(0, 18, 0, 0) };
+
+        var convert = new Button
+        {
+            Tag = capture.Id.ToString(),
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            HorizontalContentAlignment = HorizontalAlignment.Stretch,
+            Background = new SolidColorBrush(ColorHelper.FromArgb(255, 238, 247, 238)),
+            BorderBrush = new SolidColorBrush(ColorHelper.FromArgb(255, 184, 210, 186)),
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(10),
+            Padding = new Thickness(16, 14, 16, 14)
+        };
+        var convertLayout = new Grid { ColumnSpacing = 14 };
+        convertLayout.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        convertLayout.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        var convertCopy = new StackPanel { Spacing = 4 };
+        convertCopy.Children.Add(new TextBlock { Text = "整理为路线草稿", FontWeight = Microsoft.UI.Text.FontWeights.SemiBold, FontSize = 16, Foreground = new SolidColorBrush(ColorHelper.FromArgb(255, 42, 90, 59)) });
+        convertCopy.Children.Add(new TextBlock { Text = "带入规划继续整理，原始想法仍会保留。", TextWrapping = TextWrapping.Wrap, Opacity = 0.72 });
+        convertLayout.Children.Add(convertCopy);
+        var convertIcon = new FontIcon { FontFamily = new FontFamily("Segoe Fluent Icons"), Glyph = "\uE8A7", FontSize = 20, Foreground = new SolidColorBrush(ColorHelper.FromArgb(255, 42, 90, 59)) };
+        Grid.SetColumn(convertIcon, 1);
+        convertLayout.Children.Add(convertIcon);
+        convert.Content = convertLayout;
+        AutomationProperties.SetName(convert, "整理为路线草稿");
         convert.Click += ConvertCaptureButton_Click;
         actions.Children.Add(convert);
-        var archive = new Button { Content = "归档想法", Tag = capture.Id.ToString() };
+
+        var archiveRow = new Grid { ColumnSpacing = 12, Padding = new Thickness(16, 6, 16, 6) };
+        archiveRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        archiveRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        var archiveCopy = new StackPanel { Spacing = 2 };
+        archiveCopy.Children.Add(new TextBlock { Text = "归档想法", FontWeight = Microsoft.UI.Text.FontWeights.SemiBold });
+        archiveCopy.Children.Add(new TextBlock { Text = "暂时移出收件箱，可在归档中恢复。", Opacity = 0.62, TextWrapping = TextWrapping.Wrap });
+        archiveRow.Children.Add(archiveCopy);
+        var archive = new Button
+        {
+            Tag = capture.Id.ToString(),
+            Content = new FontIcon { FontFamily = new FontFamily("Segoe Fluent Icons"), Glyph = "\uE74D", FontSize = 18 },
+            Background = new SolidColorBrush(Colors.Transparent),
+            BorderBrush = new SolidColorBrush(ColorHelper.FromArgb(255, 216, 222, 215)),
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(18),
+            Padding = new Thickness(11),
+            MinWidth = 42,
+            MinHeight = 42
+        };
+        ToolTipService.SetToolTip(archive, "归档想法");
+        Grid.SetColumn(archive, 1);
+        archiveRow.Children.Add(archive);
+        AutomationProperties.SetName(archive, "归档想法");
         archive.Click += ArchiveCaptureButton_Click;
-        actions.Children.Add(archive);
+        actions.Children.Add(archiveRow);
         InboxDetailPanel.Children.Add(actions);
     }
 

@@ -5,10 +5,10 @@ namespace ExecutionContinuity.App;
 
 public sealed class ExecutionSession
 {
-    private readonly SqliteStateStore _store;
+    private readonly IStateStore _store;
     private readonly SemaphoreSlim _commandGate = new(1, 1);
 
-    public ExecutionSession(SqliteStateStore store)
+    public ExecutionSession(IStateStore store)
     {
         _store = store;
     }

@@ -128,6 +128,72 @@ public sealed class ExecutionSessionTests
     }
 
     [Fact]
+    public void Ui_fixture_supports_relaunch_without_reseeding()
+    {
+        var root = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", ".."));
+        var fixture = File.ReadAllText(Path.Combine(root, "tests", "ExecutionContinuity.UiFixture", "Program.cs"))
+            .Replace("\r\n", "\n");
+
+        Assert.Contains("--reuse", fixture);
+        Assert.Contains("Reusing fixture", fixture);
+        Assert.Contains("if (reuseExisting)", fixture);
+        Assert.Contains("if (args.Length > 1)", fixture);
+        Assert.Contains("await CreateFixtureAsync(databasePath);", fixture);
+        Assert.Contains("if (args.Length == 1 && !reuseExisting)", fixture);
+        Assert.DoesNotContain("args.Length == 1 && !reuseExisting))", fixture);
+    }
+
+    [Fact]
+    public async Task Fail_save_store_loads_real_state_but_rejects_every_write()
+    {
+        var path = NewDatabasePath();
+        try
+        {
+            var route = Route.Create("Archived", Step.Create("Action", "Done", "Boundary"));
+            var initial = AppState.Create(route);
+            await new SqliteStateStore(path).SaveAsync(initial);
+
+            var store = new FailSaveStateStore(new SqliteStateStore(path));
+            var loaded = await store.LoadAsync();
+
+            Assert.Equal(initial.Routes.Select(item => item.Id), loaded.Routes.Select(item => item.Id));
+            await Assert.ThrowsAsync<InvalidOperationException>(() => store.SaveAsync(initial));
+        }
+        finally
+        {
+            DeleteDatabase(path);
+        }
+    }
+
+    [Fact]
+    public void Ui_fixture_has_dedicated_reuse_and_fail_save_launchers()
+    {
+        var root = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", ".."));
+        var reuseProject = File.ReadAllText(Path.Combine(root, "tests", "ExecutionContinuity.UiFixture.Reuse", "Program.cs"));
+        var failProject = File.ReadAllText(Path.Combine(root, "tests", "ExecutionContinuity.UiFixture.FailSave", "Program.cs"));
+
+        Assert.Contains("ui004-fixture", reuseProject);
+        Assert.Contains("EXECUTION_CONTINUITY_DATABASE", reuseProject);
+        Assert.Contains("ExecutionContinuity.App.exe", reuseProject);
+        Assert.Contains("ui004-fixture", failProject);
+        Assert.Contains("EXECUTION_CONTINUITY_DATABASE", failProject);
+        Assert.Contains("EXECUTION_CONTINUITY_FAIL_SAVE", failProject);
+        Assert.Contains("ExecutionContinuity.App.exe", failProject);
+        Assert.DoesNotContain("CreateFixtureAsync", reuseProject);
+    }
+
+    [Fact]
+    public void Main_window_only_enables_fail_save_store_for_the_explicit_fixture_switch()
+    {
+        var root = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", ".."));
+        var code = File.ReadAllText(Path.Combine(root, "src", "ExecutionContinuity.App", "MainWindow.xaml.cs"));
+
+        Assert.Contains("DatabaseLocator.FailSaveEnvironmentVariable", code);
+        Assert.Contains("new FailSaveStateStore(store)", code);
+        Assert.Contains("State store=", code);
+    }
+
+    [Fact]
     public void Main_window_explicitly_sets_the_native_window_title()
     {
         var codePath = Path.GetFullPath(Path.Combine(
@@ -311,7 +377,7 @@ public sealed class ExecutionSessionTests
             AppContext.BaseDirectory,
             "..", "..", "..", "..", "..",
             "src", "ExecutionContinuity.App", "MainWindow.xaml"));
-        var xaml = File.ReadAllText(xamlPath);
+        var xaml = File.ReadAllText(xamlPath).Replace("\r\n", "\n");
         var codePath = Path.GetFullPath(Path.Combine(
             AppContext.BaseDirectory,
             "..", "..", "..", "..", "..",

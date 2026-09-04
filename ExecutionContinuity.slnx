@@ -8,5 +8,8 @@
     <Project Path="tests/ExecutionContinuity.Domain.Tests/ExecutionContinuity.Domain.Tests.csproj" />
     <Project Path="tests/ExecutionContinuity.Persistence.Tests/ExecutionContinuity.Persistence.Tests.csproj" />
     <Project Path="tests/ExecutionContinuity.App.Tests/ExecutionContinuity.App.Tests.csproj" />
+    <Project Path="tests/ExecutionContinuity.UiFixture/ExecutionContinuity.UiFixture.csproj" />
+    <Project Path="tests/ExecutionContinuity.UiFixture.Reuse/ExecutionContinuity.UiFixture.Reuse.csproj" />
+    <Project Path="tests/ExecutionContinuity.UiFixture.FailSave/ExecutionContinuity.UiFixture.FailSave.csproj" />
   </Folder>
 </Solution>

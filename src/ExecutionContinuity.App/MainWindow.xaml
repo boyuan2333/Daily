@@ -186,12 +186,36 @@
                                             <Border Background="#FFFFFF" BorderBrush="#B8C4B9" BorderThickness="1" CornerRadius="8" MinHeight="44">
                                                 <TextBox x:Name="FallbackActionInput" Background="Transparent" BorderThickness="0" Padding="14,10" FontFamily="Microsoft YaHei UI" FontSize="15" PlaceholderText="可选的预设备选动作" AcceptsReturn="True" TextWrapping="Wrap" />
                                             </Border>
-                                            <StackPanel Orientation="Horizontal" Spacing="10">
-                                                <Button x:Name="AddStepButton" Content="添加步骤" Click="AddStepButton_Click" Background="#FFFFFF" Foreground="#202521" BorderBrush="#D8DED7" BorderThickness="1" Padding="16,10" MinHeight="42" />
-                                                <Button Content="清空步骤" Click="ClearStepButton_Click" Background="Transparent" BorderBrush="Transparent" Padding="17,8" MinHeight="36" />
+                                            <StackPanel Spacing="12">
+                                                <Button x:Name="AddStepButton" Click="AddStepButton_Click" Background="#EEF7EE" Foreground="#2A5A3B" BorderBrush="#B8D2BA" BorderThickness="1" CornerRadius="10" Padding="16,14" MinHeight="72" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch">
+                                                    <Grid ColumnSpacing="14">
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="*" />
+                                                            <ColumnDefinition Width="Auto" />
+                                                        </Grid.ColumnDefinitions>
+                                                        <StackPanel Spacing="4">
+                                                            <TextBlock Text="添加步骤" FontSize="16" FontWeight="SemiBold" />
+                                                            <TextBlock Text="将当前填写的动作加入路线草稿。" Opacity="0.72" TextWrapping="Wrap" />
+                                                        </StackPanel>
+                                                        <FontIcon Grid.Column="1" FontFamily="Segoe Fluent Icons" Glyph="&#xE8A7;" FontSize="20" VerticalAlignment="Center" />
+                                                    </Grid>
+                                                </Button>
+                                                <Button Click="ClearStepButton_Click" Background="Transparent" Foreground="#202521" BorderBrush="Transparent" Padding="16,6" MinHeight="54" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch">
+                                                    <Grid ColumnSpacing="12">
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="*" />
+                                                            <ColumnDefinition Width="Auto" />
+                                                        </Grid.ColumnDefinitions>
+                                                        <StackPanel Spacing="2">
+                                                            <TextBlock Text="清空步骤" FontWeight="SemiBold" />
+                                                            <TextBlock Text="清除当前正在编辑的步骤内容。" Opacity="0.62" TextWrapping="Wrap" />
+                                                        </StackPanel>
+                                                        <FontIcon Grid.Column="1" FontFamily="Segoe Fluent Icons" Glyph="&#xE74D;" FontSize="18" VerticalAlignment="Center" Opacity="0.72" />
+                                                    </Grid>
+                                                </Button>
                                             </StackPanel>
                                             <StackPanel x:Name="DraftStepsPanel" Spacing="6" />
-                                            <Button x:Name="SaveRouteButton" Content="保存草稿路线" Click="CreateRouteButton_Click" Background="#4A845E" Foreground="White" BorderBrush="#4A845E" Padding="18,10" MinHeight="42" HorizontalAlignment="Left" />
+                                            <Button x:Name="SaveRouteButton" Content="保存草稿路线" Click="CreateRouteButton_Click" Background="#4A845E" Foreground="White" BorderBrush="#4A845E" CornerRadius="8" Padding="18,10" MinHeight="42" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Margin="0,4,0,0" />
                                         </StackPanel>
                                     </Border>
                                 </StackPanel>

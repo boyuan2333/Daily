@@ -16,6 +16,13 @@ public enum ExecutionMode
     Blocked
 }
 
+public enum LanguagePreference
+{
+    FollowSystem,
+    SimplifiedChinese,
+    English
+}
+
 public sealed record Step(
     Guid Id,
     int Position,
@@ -63,7 +70,12 @@ public sealed record ExecutionSnapshot(
     DateTimeOffset PausedAt,
     string? Note);
 
-public sealed record CaptureEntry(Guid Id, string RawText, DateTimeOffset CapturedAt, bool IsArchived = false);
+public sealed record CaptureEntry(
+    Guid Id,
+    string RawText,
+    DateTimeOffset CapturedAt,
+    bool IsArchived = false,
+    string? OrganizedText = null);
 
 public sealed record ExecutionState(
     Guid? ActiveRouteId,
@@ -80,12 +92,14 @@ public sealed class AppState
         IReadOnlyList<Route> routes,
         ExecutionState execution,
         IReadOnlyList<ExecutionSnapshot> snapshots,
-        IReadOnlyList<CaptureEntry> captures)
+        IReadOnlyList<CaptureEntry> captures,
+        LanguagePreference languagePreference)
     {
         _routes = routes;
         Execution = execution;
         _snapshots = snapshots;
         _captures = captures;
+        LanguagePreference = languagePreference;
     }
 
     public IReadOnlyList<Route> Routes => _routes;
@@ -96,13 +110,16 @@ public sealed class AppState
 
     public IReadOnlyList<CaptureEntry> Captures => _captures;
 
+    public LanguagePreference LanguagePreference { get; }
+
     public static AppState Create(params Route[] routes)
     {
         var state = new AppState(
             routes.ToArray(),
             new ExecutionState(null, null),
             Array.Empty<ExecutionSnapshot>(),
-            Array.Empty<CaptureEntry>());
+            Array.Empty<CaptureEntry>(),
+            LanguagePreference.FollowSystem);
         state.ValidateInvariants();
         return state;
     }
@@ -111,7 +128,8 @@ public sealed class AppState
         IEnumerable<Route> routes,
         ExecutionState execution,
         IEnumerable<ExecutionSnapshot> snapshots,
-        IEnumerable<CaptureEntry> captures)
+        IEnumerable<CaptureEntry> captures,
+        LanguagePreference languagePreference = LanguagePreference.FollowSystem)
     {
         var routeArray = routes.ToArray();
         if (execution.ActiveRouteId is Guid activeRouteId)
@@ -136,7 +154,8 @@ public sealed class AppState
             routeArray,
             execution,
             snapshots.ToArray(),
-            captures.ToArray());
+            captures.ToArray(),
+            languagePreference);
         state.ValidateInvariants();
         return state;
     }
@@ -175,13 +194,15 @@ public sealed class AppState
         IReadOnlyList<Route> routes,
         ExecutionState execution,
         IReadOnlyList<ExecutionSnapshot>? snapshots = null,
-        IReadOnlyList<CaptureEntry>? captures = null)
+        IReadOnlyList<CaptureEntry>? captures = null,
+        LanguagePreference? languagePreference = null)
     {
         var next = new AppState(
             routes,
             execution,
             snapshots ?? Snapshots,
-            captures ?? Captures);
+            captures ?? Captures,
+            languagePreference ?? LanguagePreference);
         next.ValidateInvariants();
         return next;
     }
@@ -379,6 +400,27 @@ public static class StateTransitions
             .ToArray();
         return state.With(state.Routes, state.Execution, captures: captures);
     }
+
+    public static AppState OrganizeCapture(AppState state, Guid captureId, string? organizedText)
+    {
+        if (state.Captures.All(capture => capture.Id != captureId))
+        {
+            throw new InvalidOperationException("The capture does not exist.");
+        }
+
+        var normalized = string.IsNullOrWhiteSpace(organizedText) ? null : organizedText;
+        return state.With(
+            state.Routes,
+            state.Execution,
+            captures: state.Captures
+                .Select(capture => capture.Id == captureId
+                    ? capture with { OrganizedText = normalized }
+                    : capture)
+                .ToArray());
+    }
+
+    public static AppState SetLanguagePreference(AppState state, LanguagePreference preference) =>
+        state.With(state.Routes, state.Execution, languagePreference: preference);
 
     public static AppState Pause(AppState state, DateTimeOffset pausedAt, string? note = null)
     {

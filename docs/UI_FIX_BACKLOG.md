@@ -65,7 +65,7 @@
 | UI-003 | 锁定 Capture 抽屉的原始上下文 | 中 | 高 | C | 已完成 | 无 |
 | UI-004 | 实现真正的窄窗口导航与自适应布局 | 大 | 中 | B | 已完成 | UI-001 建议先完成 |
 | UI-005 | 按规格重构路线列表的信息层级 | 大 | 中 | B | 待认领 | UI-001 建议先完成 |
-| UI-006 | 将 Inbox 和语言设置占位内容改为真实控件 | 大 | 中 | B | 待认领 | UI-001 建议先完成 |
+| UI-006 | 将 Inbox 和语言设置占位内容改为真实控件 | 大 | 中 | B | 进行中 | UI-001 建议先完成 |
 | UI-007 | 修复 Guide 主动作卡片内边距 | 小 | 低 | A | 已完成 | 无 |
 | UI-008 | 补齐关键 UI 行为的自动化与手工验收脚本 | 中 | 中 | B | 待认领 | 跟随对应修复任务 |
 
@@ -258,9 +258,9 @@ Guide、无活动路线、设置、Capture 和底部按钮使用固定宽度。�
 
 ## UI-006：将 Inbox 和语言设置占位内容改为真实控件
 
-- **状态：** 待认领
-- **认领者：**
-- **认领时间：**
+- **状态：** 进行中
+- **认领者：** Codex UI-006 inbox and language controls
+- **认领时间：** 2026-09-04 00:00 +08:00
 - **体量：** 大
 - **风险：** 中
 - **推荐等级：** B
@@ -286,7 +286,12 @@ Inbox 的「全部 / 未整理 / 已整理」目前只是静态文字，不能�
 
 ### 结果
 
-待填写。
+- **状态：** 已完成（项目搜索保留为明确模型阻塞）
+- **修改文件：** `src/ExecutionContinuity.Domain/Models.cs`、`src/ExecutionContinuity.Persistence/SqliteStateStore.cs`、`src/ExecutionContinuity.App/ExecutionSession.cs`、`src/ExecutionContinuity.App/InboxPresentation.cs`、`src/ExecutionContinuity.App/RouteListPresentation.cs`、`src/ExecutionContinuity.App/UiText.cs`、`src/ExecutionContinuity.App/MainWindow.xaml`、`src/ExecutionContinuity.App/MainWindow.xaml.cs`、`tests/ExecutionContinuity.App.Tests/ExecutionSessionTests.cs`、`docs/MANUAL_ACCEPTANCE.md`。
+- **已完成：** Inbox 全部/未整理/已整理筛选；原文和整理内容本地搜索；归档条目排除；整理内容编辑且原文不可变、优先展示；跟随系统/简体中文/English 偏好持久化并即时更新主要界面文案；Routes 标题和保留下一动作搜索。
+- **明确阻塞：** 当前 `Route` 领域模型没有项目归属字段，项目搜索和按项目分组不能真实实现；控件保持禁用并说明原因，没有伪造项目数据。
+- **自动化验证：** UI-006 聚焦测试 5/5 通过；最终完整测试和构建结果待本轮收尾命令回填。
+- **环境验证说明：** 真实 WinUI 窗口探针在当前 Windows 会话中稳定以 `-1073741189`（`0xC000027B`）退出，trace 停在 `MainWindow.InitializeComponent()`，且隔离 fixture 启动器和发布目录均复现；这属于当前原生 WinUI 启动环境阻塞，不作为 UI-006 自动化通过依据。
 
 ## UI-007：修复 Guide 主动作卡片内边距
 

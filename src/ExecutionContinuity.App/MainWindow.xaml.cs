@@ -37,6 +37,11 @@ public sealed partial class MainWindow : Window
     private ResponsivePlanningPresentation _responsivePlanning = ResponsivePlanningPresentation.Create(WindowPresentation.DefaultWidth);
     private readonly List<Step> _draftSteps = new();
     private readonly HashSet<Guid> _expandedPausedRoutes = new();
+    private InboxFilter _inboxFilter = InboxFilter.All;
+    private string _inboxSearchText = string.Empty;
+    private string _routeSearchText = string.Empty;
+    private TextBox? _organizedCaptureInput;
+    private Guid? _organizedCaptureId;
 
     public MainWindow()
     {
@@ -78,6 +83,7 @@ public sealed partial class MainWindow : Window
 
     private void Render(string? confirmation = null)
     {
+        ApplyLanguage();
         var presentation = GuidePresentation.From(_session.State);
         GuidePanel.Visibility = ToVisibility(!_settingsOpen && !_planningMode && presentation.Screen != GuideScreen.NoActiveRoute);
         NoActivePanel.Visibility = ToVisibility(!_settingsOpen && !_planningMode && presentation.Screen == GuideScreen.NoActiveRoute);
@@ -137,9 +143,20 @@ public sealed partial class MainWindow : Window
         SetSelected(ArchiveNavButton, _planningDestination == PlanningDestination.Archive);
         SetSelected(RoutesByStatusButton, true);
         RoutesByProjectButton.IsEnabled = false;
+        SetSelected(InboxAllButton, _inboxFilter == InboxFilter.All);
+        SetSelected(InboxUnorganizedButton, _inboxFilter == InboxFilter.Unorganized);
+        SetSelected(InboxOrganizedButton, _inboxFilter == InboxFilter.Organized);
         RenderDraftSteps();
         RouteListPanel.Children.Clear();
-        var sections = RouteListPresentation.GroupByStatus(_session.State);
+        var matchingRouteIds = RouteListPresentation.Search(_session.State, _routeSearchText)
+            .Select(route => route.Id)
+            .ToHashSet();
+        var sections = RouteListPresentation.GroupByStatus(_session.State)
+            .Select(section => new RouteListSection(
+                section.Title,
+                section.Routes.Where(route => matchingRouteIds.Contains(route.Id)).ToArray()))
+            .Where(section => section.Routes.Count > 0)
+            .ToArray();
         foreach (var section in sections)
         {
             RouteListPanel.Children.Add(new TextBlock
@@ -160,7 +177,7 @@ public sealed partial class MainWindow : Window
                 });
                 line.Children.Add(new TextBlock
                 {
-                    Text = $"{item.NextAction} · {item.ProgressText} 步",
+                    Text = $"{item.NextAction} · {item.ProgressText} {T("步", "steps")}",
                     TextWrapping = TextWrapping.Wrap,
                     Opacity = 0.78
                 });
@@ -168,32 +185,32 @@ public sealed partial class MainWindow : Window
                 {
                     line.Children.Add(new TextBlock
                     {
-                        Text = $"暂停于：{pausedAt.LocalDateTime:g}",
+                        Text = $"{T("暂停于", "Paused at")}：{pausedAt.LocalDateTime:g}",
                         Opacity = 0.62
                     });
                 }
 
                 var controls = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
-                var select = new Button { Content = "查看路线", Tag = route.Id.ToString() };
+                var select = new Button { Content = T("查看路线", "View route"), Tag = route.Id.ToString() };
                 select.Click += OpenRouteDetailButton_Click;
                 controls.Children.Add(select);
                 if (route.Lifecycle is RouteLifecycle.Draft or RouteLifecycle.Paused && route.CurrentStep() is not null)
                 {
-                    var activate = new Button { Content = "设为当前路线", Tag = route.Id.ToString() };
+                    var activate = new Button { Content = T("设为当前路线", "Make current"), Tag = route.Id.ToString() };
                     activate.Click += ActivateRouteButton_Click;
                     controls.Children.Add(activate);
                 }
 
                 if (route.Lifecycle != RouteLifecycle.Archived)
                 {
-                    var edit = new Button { Content = "编辑路线", Tag = route.Id.ToString() };
+                    var edit = new Button { Content = T("编辑路线", "Edit route"), Tag = route.Id.ToString() };
                     edit.Click += EditRouteButton_Click;
                     controls.Children.Add(edit);
                 }
 
                 if (route.Id != _session.State.Execution.ActiveRouteId && route.Lifecycle != RouteLifecycle.Archived)
                 {
-                    var archive = new Button { Content = "归档路线", Tag = route.Id.ToString() };
+                    var archive = new Button { Content = T("归档路线", "Archive route"), Tag = route.Id.ToString() };
                     archive.Click += ArchiveRouteButton_Click;
                     controls.Children.Add(archive);
                 }
@@ -203,7 +220,7 @@ public sealed partial class MainWindow : Window
                 {
                     var disclosure = new Button
                     {
-                        Content = _expandedPausedRoutes.Contains(route.Id) ? "收起返回上下文" : "展开返回上下文",
+                        Content = _expandedPausedRoutes.Contains(route.Id) ? T("收起返回上下文", "Hide return context") : T("展开返回上下文", "Show return context"),
                         Tag = route.Id.ToString(),
                         HorizontalAlignment = HorizontalAlignment.Left,
                         Background = TransparentBrush,
@@ -230,15 +247,18 @@ public sealed partial class MainWindow : Window
             }
         }
 
-        if (sections.Count == 0)
+        if (sections.Length == 0)
         {
-            RouteListPanel.Children.Add(new TextBlock { Text = "尚无路线。", Opacity = 0.68 });
+            RouteListPanel.Children.Add(new TextBlock
+            {
+                Text = string.IsNullOrWhiteSpace(_routeSearchText)
+                    ? T("尚无路线。", "No routes yet.")
+                    : T("没有匹配的路线。", "No matching routes."),
+                Opacity = 0.68
+            });
         }
 
-        var visibleCaptures = _session.State.Captures
-            .Where(capture => !capture.IsArchived)
-            .OrderByDescending(capture => capture.CapturedAt)
-            .ToArray();
+        var visibleCaptures = InboxPresentation.Filter(_session.State.Captures, _inboxFilter, _inboxSearchText);
         if (_responsivePlanning.Inbox.SelectedItemId is not Guid selectedCaptureId || visibleCaptures.All(capture => capture.Id != selectedCaptureId))
         {
             _responsivePlanning = _responsivePlanning with
@@ -251,7 +271,8 @@ public sealed partial class MainWindow : Window
         foreach (var capture in visibleCaptures)
         {
             var content = new StackPanel { Spacing = 5 };
-            var preview = capture.RawText.Length > 72 ? $"{capture.RawText[..72]}..." : capture.RawText;
+            var displayText = InboxPresentation.DisplayText(capture);
+            var preview = displayText.Length > 72 ? $"{displayText[..72]}..." : displayText;
             content.Children.Add(new TextBlock { Text = preview, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold, TextWrapping = TextWrapping.Wrap });
             content.Children.Add(new TextBlock { Text = capture.CapturedAt.LocalDateTime.ToString("g"), Opacity = 0.62 });
             var select = new Button
@@ -270,9 +291,15 @@ public sealed partial class MainWindow : Window
             InboxPanel.Children.Add(select);
         }
 
-        if (visibleCaptures.Length == 0)
+        if (visibleCaptures.Count == 0)
         {
-            InboxPanel.Children.Add(new TextBlock { Text = "尚未捕捉到想法。", Opacity = 0.68 });
+            InboxPanel.Children.Add(new TextBlock
+            {
+                Text = string.IsNullOrWhiteSpace(_inboxSearchText) && _inboxFilter == InboxFilter.All
+                    ? T("尚未捕捉到想法。", "No captured ideas yet.")
+                    : T("没有匹配的想法。", "No matching ideas."),
+                Opacity = 0.68
+            });
         }
 
         RenderInboxDetail(visibleCaptures.SingleOrDefault(capture => capture.Id == _responsivePlanning.Inbox.SelectedItemId));
@@ -328,6 +355,36 @@ public sealed partial class MainWindow : Window
         RenderPlanning();
     }
 
+    private void RouteSearchInput_TextChanged(object sender, TextChangedEventArgs e)
+    {
+        _routeSearchText = RouteSearchInput.Text;
+        if (_planningMode && _planningDestination == PlanningDestination.Routes)
+        {
+            RenderPlanning();
+        }
+    }
+
+    private void InboxSearchInput_TextChanged(object sender, TextChangedEventArgs e)
+    {
+        _inboxSearchText = InboxSearchInput.Text;
+        if (_planningMode && _planningDestination == PlanningDestination.Inbox)
+        {
+            RenderPlanning();
+        }
+    }
+
+    private void InboxFilterButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button { Tag: string filter } ||
+            !Enum.TryParse<InboxFilter>(filter, out var parsed))
+        {
+            return;
+        }
+
+        _inboxFilter = parsed;
+        RenderPlanning();
+    }
+
     private void TogglePausedRouteButton_Click(object sender, RoutedEventArgs e)
     {
         if (!TryReadTag(sender, out var routeId))
@@ -346,16 +403,39 @@ public sealed partial class MainWindow : Window
     private void RenderInboxDetail(CaptureEntry? capture)
     {
         InboxDetailPanel.Children.Clear();
+        _organizedCaptureInput = null;
+        _organizedCaptureId = null;
         if (capture is null)
         {
-            InboxDetailPanel.Children.Add(new TextBlock { Text = "选择一条已捕捉的想法进行查看。", FontSize = 24, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold });
-            InboxDetailPanel.Children.Add(new TextBlock { Text = "底部栏随时可以捕捉想法。", Foreground = new SolidColorBrush(Colors.DimGray) });
+            InboxDetailPanel.Children.Add(new TextBlock { Text = T("选择一条已捕捉的想法进行查看。", "Select a captured idea to view it."), FontSize = 24, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold });
+            InboxDetailPanel.Children.Add(new TextBlock { Text = T("底部栏随时可以捕捉想法。", "Capture is always available in the bottom bar."), Foreground = new SolidColorBrush(Colors.DimGray) });
             return;
         }
 
-        InboxDetailPanel.Children.Add(new TextBlock { Text = "已捕捉的想法", FontSize = 24, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold });
-        InboxDetailPanel.Children.Add(new TextBlock { Text = $"捕捉时间：{capture.CapturedAt.LocalDateTime:g}", Foreground = new SolidColorBrush(Colors.DimGray) });
-        InboxDetailPanel.Children.Add(new TextBlock { Text = "原始记录", FontWeight = Microsoft.UI.Text.FontWeights.SemiBold, Margin = new Thickness(0, 12, 0, 0) });
+        InboxDetailPanel.Children.Add(new TextBlock { Text = T("已捕捉的想法", "Captured idea"), FontSize = 24, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold });
+        InboxDetailPanel.Children.Add(new TextBlock { Text = $"{T("捕捉时间", "Captured at")}：{capture.CapturedAt.LocalDateTime:g}", Foreground = new SolidColorBrush(Colors.DimGray) });
+
+        InboxDetailPanel.Children.Add(new TextBlock { Text = T("整理后内容", "Organized content"), FontWeight = Microsoft.UI.Text.FontWeights.SemiBold, Margin = new Thickness(0, 12, 0, 0) });
+        _organizedCaptureId = capture.Id;
+        _organizedCaptureInput = new TextBox
+        {
+            Text = capture.OrganizedText ?? string.Empty,
+            AcceptsReturn = true,
+            TextWrapping = TextWrapping.Wrap,
+            MinHeight = 110,
+            PlaceholderText = T("可选：写下整理后的内容", "Optional: write an organized version")
+        };
+        InboxDetailPanel.Children.Add(_organizedCaptureInput);
+        var saveOrganized = new Button
+        {
+            Content = T("保存整理内容", "Save organized content"),
+            Tag = capture.Id.ToString(),
+            HorizontalAlignment = HorizontalAlignment.Left
+        };
+        saveOrganized.Click += SaveOrganizedCaptureButton_Click;
+        InboxDetailPanel.Children.Add(saveOrganized);
+
+        InboxDetailPanel.Children.Add(new TextBlock { Text = T("原始记录（不可变）", "Original record (immutable)"), FontWeight = Microsoft.UI.Text.FontWeights.SemiBold, Margin = new Thickness(0, 12, 0, 0) });
         var original = new Border
         {
             Background = new SolidColorBrush(Colors.White),
@@ -367,10 +447,10 @@ public sealed partial class MainWindow : Window
         };
         InboxDetailPanel.Children.Add(original);
         var actions = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 10, Margin = new Thickness(0, 10, 0, 0) };
-        var convert = new Button { Content = "转换为草稿路线", Tag = capture.Id.ToString() };
+        var convert = new Button { Content = T("转换为草稿路线", "Convert to draft route"), Tag = capture.Id.ToString() };
         convert.Click += ConvertCaptureButton_Click;
         actions.Children.Add(convert);
-        var archive = new Button { Content = "归档想法", Tag = capture.Id.ToString() };
+        var archive = new Button { Content = T("归档想法", "Archive idea"), Tag = capture.Id.ToString() };
         archive.Click += ArchiveCaptureButton_Click;
         actions.Children.Add(archive);
         InboxDetailPanel.Children.Add(actions);
@@ -387,6 +467,18 @@ public sealed partial class MainWindow : Window
             RenderPlanning();
             RestorePlanningListContext();
         }
+    }
+
+    private async void SaveOrganizedCaptureButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_organizedCaptureId is not Guid captureId || _organizedCaptureInput is null)
+        {
+            return;
+        }
+
+        await RunAsync(
+            () => _session.OrganizeCaptureAsync(captureId, _organizedCaptureInput.Text),
+            T("整理内容已保存。", "Organized content saved."));
     }
 
     private void OpenRouteDetailButton_Click(object sender, RoutedEventArgs e)
@@ -656,6 +748,17 @@ public sealed partial class MainWindow : Window
 
         _settingsOpen = false;
         Render();
+    }
+
+    private async void LanguagePreferenceButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button { Tag: string value } ||
+            !Enum.TryParse<LanguagePreference>(value, out var preference))
+        {
+            return;
+        }
+
+        await RunAsync(() => _session.SetLanguagePreferenceAsync(preference));
     }
 
     private async void CreateRouteButton_Click(object sender, RoutedEventArgs e)
@@ -938,6 +1041,51 @@ public sealed partial class MainWindow : Window
     }
 
     private static Visibility ToVisibility(bool value) => value ? Visibility.Visible : Visibility.Collapsed;
+
+    private string T(string simplifiedChinese, string english) =>
+        UiText.Choose(_session.State.LanguagePreference, simplifiedChinese, english);
+
+    private void ApplyLanguage()
+    {
+        GuideModeButton.Content = T("引导", "Guide");
+        PlanningModeButton.Content = T("规划", "Planning");
+        ToolTipService.SetToolTip(SettingsButton, T("设置", "Settings"));
+        PlanningTitleText.Text = T("规划", "Planning");
+        PlanningSubtitleText.Text = T("管理", "Manage");
+        RoutesNavButton.Content = T("路线", "Routes");
+        InboxNavButton.Content = T("收件箱", "Inbox");
+        ArchiveNavButton.Content = T("归档", "Archive");
+        RoutesTitleText.Text = T("路线", "Routes");
+        RouteSearchInput.PlaceholderText = T("搜索路线标题或下一动作", "Search route title or next action");
+        RoutesByStatusButton.Content = T("按状态", "By status");
+        RoutesByProjectButton.Content = T("按项目", "By project");
+        ToolTipService.SetToolTip(RoutesByProjectButton, T("领域模型尚未提供项目归属", "Project ownership is not in the domain model yet"));
+        InboxTitleText.Text = T("收件箱", "Inbox");
+        InboxSearchInput.PlaceholderText = T("搜索原文或整理内容", "Search raw or organized text");
+        InboxAllButton.Content = T("全部", "All");
+        InboxUnorganizedButton.Content = T("未整理", "Unorganized");
+        InboxOrganizedButton.Content = T("已整理", "Organized");
+        CaptureFooterButton.Content = T("捕捉想法", "Capture idea");
+        SettingsTitleText.Text = T("设置", "Settings");
+        LanguageTitleText.Text = T("语言", "Language");
+        LanguageSystemButton.Content = T("跟随系统", "Follow system");
+        LanguageChineseButton.Content = T("简体中文", "Simplified Chinese");
+        LanguageEnglishButton.Content = "English";
+        LanguageCurrentText.Text = _session.State.LanguagePreference switch
+        {
+            LanguagePreference.FollowSystem => T("当前：跟随系统", "Current: Follow system"),
+            LanguagePreference.SimplifiedChinese => T("当前：简体中文", "Current: Simplified Chinese"),
+            LanguagePreference.English => T("当前：English", "Current: English"),
+            _ => string.Empty
+        };
+        LanguageDescriptionText.Text = T(
+            "界面语言可以立即切换。路线、步骤、备注和捕捉原文会保持原样，不会自动翻译。",
+            "The interface language changes immediately. Routes, steps, notes, and raw captures stay exactly as written.");
+        CloseSettingsButton.Content = T("返回", "Back");
+        SetSelected(LanguageSystemButton, _session.State.LanguagePreference == LanguagePreference.FollowSystem);
+        SetSelected(LanguageChineseButton, _session.State.LanguagePreference == LanguagePreference.SimplifiedChinese);
+        SetSelected(LanguageEnglishButton, _session.State.LanguagePreference == LanguagePreference.English);
+    }
 
     private void RootGrid_SizeChanged(object sender, SizeChangedEventArgs e)
     {

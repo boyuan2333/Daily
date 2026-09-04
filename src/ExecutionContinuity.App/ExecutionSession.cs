@@ -32,6 +32,17 @@ public sealed class ExecutionSession
     public Task CaptureAsync(string rawText, CancellationToken cancellationToken = default) =>
         CommitAsync(state => StateTransitions.Capture(state, rawText, DateTimeOffset.Now), cancellationToken);
 
+    public Task OrganizeCaptureAsync(
+        Guid captureId,
+        string? organizedText,
+        CancellationToken cancellationToken = default) =>
+        CommitAsync(state => StateTransitions.OrganizeCapture(state, captureId, organizedText), cancellationToken);
+
+    public Task SetLanguagePreferenceAsync(
+        LanguagePreference preference,
+        CancellationToken cancellationToken = default) =>
+        CommitAsync(state => StateTransitions.SetLanguagePreference(state, preference), cancellationToken);
+
     public Task PauseAsync(string? note = null, CancellationToken cancellationToken = default) =>
         CommitAsync(state => StateTransitions.Pause(state, DateTimeOffset.Now, note), cancellationToken);
 

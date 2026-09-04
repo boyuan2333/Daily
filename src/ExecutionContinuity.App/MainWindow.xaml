@@ -129,8 +129,8 @@
                         </Grid.ColumnDefinitions>
                         <Border x:Name="PlanningNavigationSurface" Background="#F3F4EF" BorderBrush="#E1E6E0" BorderThickness="0,0,1,0" Padding="16">
                             <StackPanel Spacing="8">
-                                <TextBlock Text="规划" FontSize="22" FontWeight="SemiBold" Margin="0,12,0,0" />
-                                <TextBlock Text="管理" Foreground="#66706A" Margin="0,0,0,18" />
+                                <TextBlock x:Name="PlanningTitleText" Text="规划" FontSize="22" FontWeight="SemiBold" Margin="0,12,0,0" />
+                                <TextBlock x:Name="PlanningSubtitleText" Text="管理" Foreground="#66706A" Margin="0,0,0,18" />
                                 <Button x:Name="RoutesNavButton" Content="路线" Click="RoutesNavButton_Click" Background="#4A845E" Foreground="White" BorderBrush="#4A845E" Padding="12,8" MinHeight="36" HorizontalAlignment="Stretch" />
                                 <Button x:Name="InboxNavButton" Content="收件箱" Click="InboxNavButton_Click" Background="Transparent" BorderBrush="Transparent" Padding="12,8" MinHeight="36" HorizontalAlignment="Stretch" />
                                 <Button x:Name="ArchiveNavButton" Content="归档" Click="ArchiveNavButton_Click" Background="Transparent" BorderBrush="Transparent" Padding="12,8" MinHeight="36" HorizontalAlignment="Stretch" />
@@ -162,7 +162,10 @@
                                             <ColumnDefinition Width="*" />
                                             <ColumnDefinition Width="Auto" />
                                         </Grid.ColumnDefinitions>
-                                        <TextBlock Text="路线" FontSize="20" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                        <StackPanel Spacing="8">
+                                            <TextBlock x:Name="RoutesTitleText" Text="路线" FontSize="20" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                            <TextBox x:Name="RouteSearchInput" PlaceholderText="搜索路线标题或下一动作" TextChanged="RouteSearchInput_TextChanged" MinHeight="36" />
+                                        </StackPanel>
                                         <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6">
                                             <Button x:Name="RoutesByStatusButton" Content="按状态" Click="RoutesByStatusButton_Click" Padding="10,6" MinHeight="34" />
                                             <Button x:Name="RoutesByProjectButton" Content="按项目" IsEnabled="False" Padding="10,6" MinHeight="34" ToolTipService.ToolTip="领域模型尚未提供项目归属" />
@@ -234,10 +237,15 @@
                                         <RowDefinition Height="Auto" />
                                         <RowDefinition Height="*" />
                                     </Grid.RowDefinitions>
-                                    <TextBlock Text="收件箱" FontSize="20" FontWeight="SemiBold" />
-                                    <Border Grid.Row="1" Background="#F0F3EE" CornerRadius="6" Padding="10">
-                                        <TextBlock Text="全部     未整理     已整理" HorizontalAlignment="Center" />
-                                    </Border>
+                                    <StackPanel Spacing="8">
+                                        <TextBlock x:Name="InboxTitleText" Text="收件箱" FontSize="20" FontWeight="SemiBold" />
+                                        <TextBox x:Name="InboxSearchInput" PlaceholderText="搜索原文或整理内容" TextChanged="InboxSearchInput_TextChanged" MinHeight="36" />
+                                    </StackPanel>
+                                    <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="6">
+                                        <Button x:Name="InboxAllButton" Content="全部" Click="InboxFilterButton_Click" Tag="All" Padding="10,6" MinHeight="34" />
+                                        <Button x:Name="InboxUnorganizedButton" Content="未整理" Click="InboxFilterButton_Click" Tag="Unorganized" Padding="10,6" MinHeight="34" />
+                                        <Button x:Name="InboxOrganizedButton" Content="已整理" Click="InboxFilterButton_Click" Tag="Organized" Padding="10,6" MinHeight="34" />
+                                    </StackPanel>
                                     <ScrollViewer x:Name="InboxListScrollViewer" Grid.Row="2" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                                         <StackPanel x:Name="InboxPanel" Spacing="10" />
                                     </ScrollViewer>
@@ -267,15 +275,20 @@
                     </Grid>
 
                     <StackPanel x:Name="SettingsPanel" MaxWidth="620" HorizontalAlignment="Stretch" VerticalAlignment="Center" Margin="32" Spacing="18">
-                        <TextBlock Text="设置" FontSize="30" FontWeight="SemiBold" HorizontalAlignment="Center" />
+                        <TextBlock x:Name="SettingsTitleText" Text="设置" FontSize="30" FontWeight="SemiBold" HorizontalAlignment="Center" />
                         <Border Background="#FFFFFF" BorderBrush="#D8DED7" BorderThickness="1" CornerRadius="8" Padding="28">
                             <StackPanel Spacing="14">
-                                <TextBlock Text="语言" FontSize="18" FontWeight="SemiBold" />
-                                <TextBlock Text="简体中文（默认）" FontWeight="SemiBold" Foreground="#2A5A3B" />
-                                <TextBlock Text="界面主语言为简体中文。路线、步骤、备注和捕捉内容会保持原样，不会自动翻译。" Foreground="#66706A" TextWrapping="Wrap" />
+                                <TextBlock x:Name="LanguageTitleText" Text="语言" FontSize="18" FontWeight="SemiBold" />
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <Button x:Name="LanguageSystemButton" Content="跟随系统" Click="LanguagePreferenceButton_Click" Tag="FollowSystem" Padding="12,8" MinHeight="36" />
+                                    <Button x:Name="LanguageChineseButton" Content="简体中文" Click="LanguagePreferenceButton_Click" Tag="SimplifiedChinese" Padding="12,8" MinHeight="36" />
+                                    <Button x:Name="LanguageEnglishButton" Content="English" Click="LanguagePreferenceButton_Click" Tag="English" Padding="12,8" MinHeight="36" />
+                                </StackPanel>
+                                <TextBlock x:Name="LanguageCurrentText" FontWeight="SemiBold" Foreground="#2A5A3B" />
+                                <TextBlock x:Name="LanguageDescriptionText" Foreground="#66706A" TextWrapping="Wrap" />
                             </StackPanel>
                         </Border>
-                        <Button Content="返回" Click="CloseSettingsButton_Click" Background="#FFFFFF" Foreground="#202521" BorderBrush="#D8DED7" BorderThickness="1" Padding="16,10" MinHeight="42" HorizontalAlignment="Center" />
+                        <Button x:Name="CloseSettingsButton" Content="返回" Click="CloseSettingsButton_Click" Background="#FFFFFF" Foreground="#202521" BorderBrush="#D8DED7" BorderThickness="1" Padding="16,10" MinHeight="42" HorizontalAlignment="Center" />
                     </StackPanel>
                 </Grid>
             </ScrollViewer>
@@ -283,7 +296,7 @@
         </Grid>
 
         <Border x:Name="BottomActionBar" Grid.Row="2" Background="#FFFFFF" BorderBrush="#E1E6E0" BorderThickness="0,1,0,0" Padding="24,7">
-            <Button Content="捕捉想法" Click="OpenCaptureButton_Click" MaxWidth="520" CornerRadius="22" Background="#F5F7F4" Foreground="#385D44" BorderBrush="#D8DED7" BorderThickness="1" Padding="22,10" MinHeight="42" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" />
+            <Button x:Name="CaptureFooterButton" Content="捕捉想法" Click="OpenCaptureButton_Click" MaxWidth="520" CornerRadius="22" Background="#F5F7F4" Foreground="#385D44" BorderBrush="#D8DED7" BorderThickness="1" Padding="22,10" MinHeight="42" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" />
         </Border>
 
         <Grid x:Name="CaptureOverlay" Grid.RowSpan="3" Visibility="Collapsed" Background="#66000000" Canvas.ZIndex="20" TabFocusNavigation="Cycle">

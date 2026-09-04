@@ -734,6 +734,137 @@ public sealed class ExecutionSessionTests
         }
     }
 
+    [Fact]
+    public async Task Ui006_organizing_capture_persists_without_changing_raw_text()
+    {
+        var path = NewDatabasePath();
+        try
+        {
+            var session = new ExecutionSession(new SqliteStateStore(path));
+            await session.LoadAsync();
+            await session.CaptureAsync("原始想法：整理季度报告");
+            var capture = session.State.Captures.Single();
+
+            await session.OrganizeCaptureAsync(capture.Id, "季度报告：先收集数据，再写提纲");
+
+            var organized = session.State.Captures.Single();
+            Assert.Equal("原始想法：整理季度报告", organized.RawText);
+            Assert.Equal("季度报告：先收集数据，再写提纲", organized.OrganizedText);
+
+            var reloaded = await new ExecutionSession(new SqliteStateStore(path)).LoadAsync();
+            var persisted = reloaded.Captures.Single();
+            Assert.Equal(organized.RawText, persisted.RawText);
+            Assert.Equal(organized.OrganizedText, persisted.OrganizedText);
+        }
+        finally
+        {
+            DeleteDatabase(path);
+        }
+    }
+
+    [Fact]
+    public void Ui006_inbox_filter_searches_both_texts_and_excludes_archived_entries()
+    {
+        var captures = new[]
+        {
+            new CaptureEntry(Guid.NewGuid(), "raw meeting note", DateTimeOffset.UtcNow, false, "整理后的项目会议"),
+            new CaptureEntry(Guid.NewGuid(), "unorganized idea", DateTimeOffset.UtcNow.AddMinutes(-1)),
+            new CaptureEntry(Guid.NewGuid(), "archived raw", DateTimeOffset.UtcNow.AddMinutes(-2), true, "archived organized")
+        };
+
+        var organized = InboxPresentation.Filter(captures, InboxFilter.Organized, "会议");
+        var unorganized = InboxPresentation.Filter(captures, InboxFilter.Unorganized, null);
+        var rawSearch = InboxPresentation.Filter(captures, InboxFilter.All, "meeting");
+
+        Assert.Single(organized);
+        Assert.Equal(captures[0].Id, organized[0].Id);
+        Assert.Single(unorganized);
+        Assert.Equal(captures[1].Id, unorganized[0].Id);
+        Assert.Single(rawSearch);
+        Assert.Equal(captures[0].Id, rawSearch[0].Id);
+        Assert.Equal("整理后的项目会议", InboxPresentation.DisplayText(captures[0]));
+    }
+
+    [Fact]
+    public void Ui006_route_search_matches_title_and_retained_next_action()
+    {
+        var route = Route.Create("Quarterly report", Step.Create("Collect source numbers", "The workbook is complete", "Do not format yet"));
+        var state = AppState.Restore(
+            new[] { route },
+            new ExecutionState(null, null),
+            new[]
+            {
+                new ExecutionSnapshot(
+                    Guid.NewGuid(),
+                    route.Id,
+                    route.Steps[0].Id,
+                    "Collect source numbers",
+                    "The workbook is complete",
+                    "Do not format yet",
+                    null,
+                    DateTimeOffset.UtcNow,
+                    "paused")
+            },
+            Array.Empty<CaptureEntry>());
+
+        Assert.Contains(route, RouteListPresentation.Search(state, "quarterly"));
+        Assert.Contains(route, RouteListPresentation.Search(state, "source numbers"));
+        Assert.Empty(RouteListPresentation.Search(state, "project-a"));
+    }
+
+    [Fact]
+    public async Task Ui006_language_preference_defaults_and_persists_without_touching_user_content()
+    {
+        var path = NewDatabasePath();
+        try
+        {
+            var session = new ExecutionSession(new SqliteStateStore(path));
+            await session.LoadAsync();
+            Assert.Equal(LanguagePreference.FollowSystem, session.State.LanguagePreference);
+
+            await session.CaptureAsync("不要翻译这段原文");
+            await session.SetLanguagePreferenceAsync(LanguagePreference.English);
+
+            var reloaded = await new ExecutionSession(new SqliteStateStore(path)).LoadAsync();
+            Assert.Equal(LanguagePreference.English, reloaded.LanguagePreference);
+            Assert.Equal("不要翻译这段原文", reloaded.Captures.Single().RawText);
+        }
+        finally
+        {
+            DeleteDatabase(path);
+        }
+    }
+
+    [Fact]
+    public async Task Ui006_failed_organized_capture_write_keeps_state_unchanged()
+    {
+        var path = NewDatabasePath();
+        try
+        {
+            var initial = AppState.Restore(
+                Array.Empty<Route>(),
+                new ExecutionState(null, null),
+                Array.Empty<ExecutionSnapshot>(),
+                new[] { new CaptureEntry(Guid.NewGuid(), "raw", DateTimeOffset.UtcNow) });
+            await new SqliteStateStore(path).SaveAsync(initial);
+            var captureId = initial.Captures.Single().Id;
+            var session = new ExecutionSession(new SqliteStateStore(
+                path,
+                beforeCommit: () => throw new InvalidOperationException("injected write failure")));
+            await session.LoadAsync();
+
+            await Assert.ThrowsAsync<InvalidOperationException>(() =>
+                session.OrganizeCaptureAsync(captureId, "organized"));
+
+            Assert.Null(session.State.Captures.Single().OrganizedText);
+            Assert.Null((await new ExecutionSession(new SqliteStateStore(path)).LoadAsync()).Captures.Single().OrganizedText);
+        }
+        finally
+        {
+            DeleteDatabase(path);
+        }
+    }
+
     private static string NewDatabasePath() =>
         Path.Combine(Path.GetTempPath(), $"execution-continuity-app-{Guid.NewGuid():N}.db");
 

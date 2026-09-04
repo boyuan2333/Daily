@@ -19,6 +19,25 @@ public sealed record RouteListItem(
 
 public static class RouteListPresentation
 {
+    public static IReadOnlyList<Route> Search(AppState state, string? query)
+    {
+        var normalized = query?.Trim();
+        var routes = state.Routes.Where(route => route.Lifecycle != RouteLifecycle.Archived);
+        if (string.IsNullOrWhiteSpace(normalized))
+        {
+            return routes.OrderBy(route => route.Title).ToArray();
+        }
+
+        return routes
+            .Where(route =>
+            {
+                var item = Describe(state, route);
+                return Contains(route.Title, normalized) || Contains(item.NextAction, normalized);
+            })
+            .OrderBy(route => route.Title)
+            .ToArray();
+    }
+
     public static IReadOnlyList<RouteListSection> GroupByStatus(AppState state)
     {
         var sections = new (string Title, RouteLifecycle Lifecycle)[]
@@ -64,4 +83,7 @@ public static class RouteListPresentation
                 .ThenBy(route => route.Title)
             : routes.OrderBy(route => route.Title);
     }
+
+    private static bool Contains(string value, string query) =>
+        value.Contains(query, StringComparison.OrdinalIgnoreCase);
 }

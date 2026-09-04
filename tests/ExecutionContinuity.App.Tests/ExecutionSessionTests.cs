@@ -456,9 +456,9 @@ public sealed class ExecutionSessionTests
         Assert.Contains("Style=\"{StaticResource PlanningSecondaryButtonStyle}\"", xaml);
         Assert.Contains("Style=\"{StaticResource PlanningDestructiveButtonStyle}\"", xaml);
         Assert.Contains("Style=\"{StaticResource PlanningPrimaryButtonStyle}\"", xaml);
-        Assert.Contains("Resources=\"{StaticResource PlanningSecondaryButtonResources}\"", xaml);
-        Assert.Contains("Resources=\"{StaticResource PlanningDestructiveButtonResources}\"", xaml);
-        Assert.Contains("Resources=\"{StaticResource PlanningPrimaryButtonResources}\"", xaml);
+        Assert.DoesNotContain("Resources=\"{StaticResource PlanningSecondaryButtonResources}\"", xaml);
+        Assert.DoesNotContain("Resources=\"{StaticResource PlanningDestructiveButtonResources}\"", xaml);
+        Assert.DoesNotContain("Resources=\"{StaticResource PlanningPrimaryButtonResources}\"", xaml);
         Assert.Contains("Glyph=\"&#xE710;\"", xaml);
         Assert.Contains("ClearStepButton_Click", xaml);
         Assert.Contains("ShowClearStepConfirmation", code);
@@ -783,6 +783,17 @@ public sealed class ExecutionSessionTests
         Assert.Single(rawSearch);
         Assert.Equal(captures[0].Id, rawSearch[0].Id);
         Assert.Equal("整理后的项目会议", InboxPresentation.DisplayText(captures[0]));
+    }
+
+    [Fact]
+    public void Main_window_does_not_assign_resource_dictionaries_to_framework_elements()
+    {
+        var root = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", ".."));
+        var xaml = File.ReadAllText(Path.Combine(root, "src", "ExecutionContinuity.App", "MainWindow.xaml"));
+
+        Assert.DoesNotContain("Resources=\"{StaticResource PlanningPrimaryButtonResources}\"", xaml);
+        Assert.DoesNotContain("Resources=\"{StaticResource PlanningSecondaryButtonResources}\"", xaml);
+        Assert.DoesNotContain("Resources=\"{StaticResource PlanningDestructiveButtonResources}\"", xaml);
     }
 
     [Fact]

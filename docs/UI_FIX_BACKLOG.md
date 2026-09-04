@@ -290,8 +290,8 @@ Inbox 的「全部 / 未整理 / 已整理」目前只是静态文字，不能�
 - **修改文件：** `src/ExecutionContinuity.Domain/Models.cs`、`src/ExecutionContinuity.Persistence/SqliteStateStore.cs`、`src/ExecutionContinuity.App/ExecutionSession.cs`、`src/ExecutionContinuity.App/InboxPresentation.cs`、`src/ExecutionContinuity.App/RouteListPresentation.cs`、`src/ExecutionContinuity.App/UiText.cs`、`src/ExecutionContinuity.App/MainWindow.xaml`、`src/ExecutionContinuity.App/MainWindow.xaml.cs`、`tests/ExecutionContinuity.App.Tests/ExecutionSessionTests.cs`、`docs/MANUAL_ACCEPTANCE.md`。
 - **已完成：** Inbox 全部/未整理/已整理筛选；原文和整理内容本地搜索；归档条目排除；整理内容编辑且原文不可变、优先展示；跟随系统/简体中文/English 偏好持久化并即时更新主要界面文案；Routes 标题和保留下一动作搜索。
 - **明确阻塞：** 当前 `Route` 领域模型没有项目归属字段，项目搜索和按项目分组不能真实实现；控件保持禁用并说明原因，没有伪造项目数据。
-- **自动化验证：** UI-006 聚焦测试 5/5 通过；`dotnet build ExecutionContinuity.slnx --no-restore --verbosity minimal` 退出码 0，0 个错误（5 个 NU1900 警告来自无法访问 NuGet 漏洞源）；`dotnet test ExecutionContinuity.slnx --no-build --verbosity minimal` 通过，App 34、Domain 22、Persistence 5，共 61/61；`git diff --check` 退出码 0。
-- **环境验证说明：** 真实 WinUI 窗口探针在当前 Windows 会话中稳定以 `-1073741189`（`0xC000027B`）退出，trace 停在 `MainWindow.InitializeComponent()`，且隔离 fixture 启动器和发布目录均复现；这属于当前原生 WinUI 启动环境阻塞，不作为 UI-006 自动化通过依据。
+- **自动化验证：** UI-006 聚焦测试 5/5 通过；新增 XAML 启动回归测试先失败后通过；`dotnet build ExecutionContinuity.slnx --no-restore --verbosity minimal` 退出码 0，0 个错误（5 个 NU1900 警告来自无法访问 NuGet 漏洞源）；修复后 `dotnet test ExecutionContinuity.slnx --no-build --verbosity minimal` 通过，App 35、Domain 22、Persistence 5，共 62/62；`git diff --check` 退出码 0。
+- **启动根因与验证：** `MainWindow.xaml` 将 `ResourceDictionary` 直接赋给按钮的 `FrameworkElement.Resources`，运行时在第 203 行抛出 `XamlParseException`，导致窗口不出现。移除 3 处无效绑定并保留按钮样式后，`Verify-ReleaseWindow.ps1` 通过：`Title='Daily'`，有效窗口句柄，隔离数据库路径为 `.ui-review\ui006-fixture\post-fix-test.db`。
 
 ## UI-007：修复 Guide 主动作卡片内边距
 

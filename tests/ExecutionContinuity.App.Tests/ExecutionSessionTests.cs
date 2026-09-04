@@ -473,6 +473,102 @@ public sealed class ExecutionSessionTests
     }
 
     [Fact]
+    public void Route_list_groups_visible_routes_by_lifecycle_and_excludes_archived_routes()
+    {
+        var currentStep = Step.Create("Current action", "Current done", "Current boundary");
+        var pausedStep = Step.Create("Paused action", "Paused done", "Paused boundary");
+        var draftStep = Step.Create("Draft action", "Draft done", "Draft boundary");
+        var completedStep = Step.Create("Completed action", "Completed done", "Completed boundary") with
+        {
+            IsCompleted = true
+        };
+
+        var current = Route.Create("Current route", currentStep) with { Lifecycle = RouteLifecycle.Active };
+        var paused = Route.Create("Paused route", pausedStep) with { Lifecycle = RouteLifecycle.Paused };
+        var draft = Route.Create("Draft route", draftStep);
+        var completed = Route.Create("Completed route", completedStep) with { Lifecycle = RouteLifecycle.Completed };
+        var archived = Route.Create("Archived route", Step.Create("Archived action", "Done", "Boundary")) with
+        {
+            Lifecycle = RouteLifecycle.Archived
+        };
+        var state = AppState.Restore(
+            [current, paused, draft, completed, archived],
+            new ExecutionState(current.Id, current.Steps[0].Id),
+            [],
+            []);
+
+        var sections = RouteListPresentation.GroupByStatus(state);
+
+        Assert.Equal(["Current", "Paused", "Draft", "Completed"], sections.Select(section => section.Title));
+        Assert.Equal("Current route", sections[0].Routes.Single().Title);
+        Assert.Equal("Paused route", sections[1].Routes.Single().Title);
+        Assert.Equal("Draft route", sections[2].Routes.Single().Title);
+        Assert.Equal("Completed route", sections[3].Routes.Single().Title);
+        Assert.DoesNotContain(sections.SelectMany(section => section.Routes), route => route.Id == archived.Id);
+    }
+
+    [Fact]
+    public void Route_list_orders_paused_routes_by_newest_valid_return_anchor()
+    {
+        var olderStep = Step.Create("Older action", "Done", "Boundary");
+        var newerStep = Step.Create("Newer action", "Done", "Boundary");
+        var older = Route.Create("Older paused", olderStep) with { Lifecycle = RouteLifecycle.Paused };
+        var newer = Route.Create("Newer paused", newerStep) with { Lifecycle = RouteLifecycle.Paused };
+        var state = AppState.Restore(
+            [older, newer],
+            new ExecutionState(null, null),
+            [
+                new ExecutionSnapshot(Guid.NewGuid(), older.Id, olderStep.Id, olderStep.Action, olderStep.CompletionStandard, olderStep.DoNotDo, olderStep.FallbackAction, new DateTimeOffset(2026, 9, 3, 8, 0, 0, TimeSpan.Zero), "older"),
+                new ExecutionSnapshot(Guid.NewGuid(), newer.Id, newerStep.Id, newerStep.Action, newerStep.CompletionStandard, newerStep.DoNotDo, newerStep.FallbackAction, new DateTimeOffset(2026, 9, 4, 8, 0, 0, TimeSpan.Zero), "newer")
+            ],
+            []);
+
+        var pausedSection = RouteListPresentation.GroupByStatus(state).Single(section => section.Title == "Paused");
+
+        Assert.Equal(["Newer paused", "Older paused"], pausedSection.Routes.Select(route => route.Title));
+    }
+
+    [Fact]
+    public void Route_list_item_uses_the_paused_anchor_and_reports_progress_and_read_only_context()
+    {
+        var completed = Step.Create("Already done", "Done", "Boundary") with { IsCompleted = true };
+        var current = Step.Create("Resume this action", "Ship the small change", "Do not redesign", "Try the prepared fallback");
+        var route = Route.Create("Paused route", completed, current) with { Lifecycle = RouteLifecycle.Paused };
+        var pausedAt = new DateTimeOffset(2026, 9, 4, 8, 30, 0, TimeSpan.Zero);
+        var state = AppState.Restore(
+            [route],
+            new ExecutionState(null, null),
+            [new ExecutionSnapshot(Guid.NewGuid(), route.Id, current.Id, current.Action, current.CompletionStandard, current.DoNotDo, current.FallbackAction, pausedAt, "Waiting for review")],
+            []);
+
+        var item = RouteListPresentation.Describe(state, route);
+
+        Assert.Equal("Resume this action", item.NextAction);
+        Assert.Equal("1/2", item.ProgressText);
+        Assert.Equal(pausedAt, item.PausedAt);
+        Assert.Equal("Ship the small change", item.CompletionStandard);
+        Assert.Equal("Do not redesign", item.DoNotDo);
+        Assert.Equal("Waiting for review", item.PauseNote);
+        Assert.Equal("Try the prepared fallback", item.FallbackAction);
+    }
+
+    [Fact]
+    public void Routes_ui_exposes_status_grouping_and_declares_project_grouping_unavailable_without_project_data()
+    {
+        var root = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", ".."));
+        var xaml = File.ReadAllText(Path.Combine(root, "src", "ExecutionContinuity.App", "MainWindow.xaml"));
+        var code = File.ReadAllText(Path.Combine(root, "src", "ExecutionContinuity.App", "MainWindow.xaml.cs"));
+
+        Assert.Contains("x:Name=\"RoutesByStatusButton\"", xaml);
+        Assert.Contains("x:Name=\"RoutesByProjectButton\"", xaml);
+        Assert.Contains("IsEnabled=\"False\"", xaml);
+        Assert.Contains("领域模型尚未提供项目归属", xaml);
+        Assert.Contains("RouteListPresentation.GroupByStatus", code);
+        Assert.Contains("RouteListPresentation.Describe", code);
+        Assert.Contains("TogglePausedRouteButton_Click", code);
+    }
+
+    [Fact]
     public void Guide_presentation_exposes_only_the_commands_allowed_by_the_execution_mode()
     {
         var fallbackRoute = Route.Create("Fallback", Step.Create("Action", "Done", "Boundary", "Fallback action"));

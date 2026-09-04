@@ -157,7 +157,17 @@
                                         <RowDefinition Height="Auto" />
                                         <RowDefinition Height="*" />
                                     </Grid.RowDefinitions>
-                                    <TextBlock Text="按状态" FontSize="20" FontWeight="SemiBold" />
+                                    <Grid ColumnSpacing="12">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="路线" FontSize="20" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6">
+                                            <Button x:Name="RoutesByStatusButton" Content="按状态" Click="RoutesByStatusButton_Click" Padding="10,6" MinHeight="34" />
+                                            <Button x:Name="RoutesByProjectButton" Content="按项目" IsEnabled="False" Padding="10,6" MinHeight="34" ToolTipService.ToolTip="领域模型尚未提供项目归属" />
+                                        </StackPanel>
+                                    </Grid>
                                     <ScrollViewer x:Name="RouteListScrollViewer" Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                                         <StackPanel x:Name="RouteListPanel" Spacing="10" />
                                     </ScrollViewer>

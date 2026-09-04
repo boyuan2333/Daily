@@ -36,6 +36,7 @@ public sealed partial class MainWindow : Window
     private Guid? _convertingCaptureId;
     private ResponsivePlanningPresentation _responsivePlanning = ResponsivePlanningPresentation.Create(WindowPresentation.DefaultWidth);
     private readonly List<Step> _draftSteps = new();
+    private readonly HashSet<Guid> _expandedPausedRoutes = new();
 
     public MainWindow()
     {
@@ -134,41 +135,102 @@ public sealed partial class MainWindow : Window
         SetSelected(RoutesNavButton, _planningDestination == PlanningDestination.Routes);
         SetSelected(InboxNavButton, _planningDestination == PlanningDestination.Inbox);
         SetSelected(ArchiveNavButton, _planningDestination == PlanningDestination.Archive);
+        SetSelected(RoutesByStatusButton, true);
+        RoutesByProjectButton.IsEnabled = false;
         RenderDraftSteps();
         RouteListPanel.Children.Clear();
-        foreach (var route in _session.State.Routes.OrderBy(route => route.Title))
+        var sections = RouteListPresentation.GroupByStatus(_session.State);
+        foreach (var section in sections)
         {
-            var line = new StackPanel { Spacing = 4 };
-            line.Children.Add(new TextBlock { Text = route.Title, Style = (Style)Application.Current.Resources["BodyStrongTextBlockStyle"] });
-            line.Children.Add(new TextBlock { Text = $"{LifecycleText(route.Lifecycle)}：{route.CurrentStep()?.Action ?? "没有未完成的动作"}", TextWrapping = TextWrapping.Wrap, Opacity = 0.72 });
-            var select = new Button { Content = "查看路线", Tag = route.Id.ToString(), HorizontalAlignment = HorizontalAlignment.Left };
-            select.Click += OpenRouteDetailButton_Click;
-            line.Children.Add(select);
-            if (route.Lifecycle is RouteLifecycle.Draft or RouteLifecycle.Paused && route.CurrentStep() is not null)
+            RouteListPanel.Children.Add(new TextBlock
             {
-                var activate = new Button { Content = "设为当前路线", Tag = route.Id.ToString(), HorizontalAlignment = HorizontalAlignment.Left };
-                activate.Click += ActivateRouteButton_Click;
-                line.Children.Add(activate);
-            }
+                Text = SectionText(section.Title),
+                Style = (Style)Application.Current.Resources["BodyStrongTextBlockStyle"],
+                Margin = new Thickness(0, 8, 0, 0)
+            });
 
-            if (route.Lifecycle != RouteLifecycle.Archived)
+            foreach (var route in section.Routes)
             {
-                var edit = new Button { Content = "编辑路线", Tag = route.Id.ToString(), HorizontalAlignment = HorizontalAlignment.Left };
-                edit.Click += EditRouteButton_Click;
-                line.Children.Add(edit);
-            }
+                var item = RouteListPresentation.Describe(_session.State, route);
+                var line = new StackPanel { Spacing = 6 };
+                line.Children.Add(new TextBlock
+                {
+                    Text = route.Title,
+                    Style = (Style)Application.Current.Resources["BodyStrongTextBlockStyle"]
+                });
+                line.Children.Add(new TextBlock
+                {
+                    Text = $"{item.NextAction} · {item.ProgressText} 步",
+                    TextWrapping = TextWrapping.Wrap,
+                    Opacity = 0.78
+                });
+                if (item.PausedAt is DateTimeOffset pausedAt)
+                {
+                    line.Children.Add(new TextBlock
+                    {
+                        Text = $"暂停于：{pausedAt.LocalDateTime:g}",
+                        Opacity = 0.62
+                    });
+                }
 
-            if (route.Id != _session.State.Execution.ActiveRouteId && route.Lifecycle != RouteLifecycle.Archived)
-            {
-                var archive = new Button { Content = "归档路线", Tag = route.Id.ToString(), HorizontalAlignment = HorizontalAlignment.Left };
-                archive.Click += ArchiveRouteButton_Click;
-                line.Children.Add(archive);
-            }
+                var controls = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
+                var select = new Button { Content = "查看路线", Tag = route.Id.ToString() };
+                select.Click += OpenRouteDetailButton_Click;
+                controls.Children.Add(select);
+                if (route.Lifecycle is RouteLifecycle.Draft or RouteLifecycle.Paused && route.CurrentStep() is not null)
+                {
+                    var activate = new Button { Content = "设为当前路线", Tag = route.Id.ToString() };
+                    activate.Click += ActivateRouteButton_Click;
+                    controls.Children.Add(activate);
+                }
 
-            RouteListPanel.Children.Add(line);
+                if (route.Lifecycle != RouteLifecycle.Archived)
+                {
+                    var edit = new Button { Content = "编辑路线", Tag = route.Id.ToString() };
+                    edit.Click += EditRouteButton_Click;
+                    controls.Children.Add(edit);
+                }
+
+                if (route.Id != _session.State.Execution.ActiveRouteId && route.Lifecycle != RouteLifecycle.Archived)
+                {
+                    var archive = new Button { Content = "归档路线", Tag = route.Id.ToString() };
+                    archive.Click += ArchiveRouteButton_Click;
+                    controls.Children.Add(archive);
+                }
+
+                line.Children.Add(controls);
+                if (item.IsPaused)
+                {
+                    var disclosure = new Button
+                    {
+                        Content = _expandedPausedRoutes.Contains(route.Id) ? "收起返回上下文" : "展开返回上下文",
+                        Tag = route.Id.ToString(),
+                        HorizontalAlignment = HorizontalAlignment.Left,
+                        Background = TransparentBrush,
+                        BorderBrush = TransparentBrush,
+                        Padding = new Thickness(0, 4, 0, 4)
+                    };
+                    disclosure.Click += TogglePausedRouteButton_Click;
+                    line.Children.Add(disclosure);
+                    if (_expandedPausedRoutes.Contains(route.Id))
+                    {
+                        AddPausedContext(line, item);
+                    }
+                }
+
+                RouteListPanel.Children.Add(new Border
+                {
+                    Background = new SolidColorBrush(Colors.White),
+                    BorderBrush = new SolidColorBrush(Colors.LightGray),
+                    BorderThickness = new Thickness(1),
+                    CornerRadius = new CornerRadius(8),
+                    Padding = new Thickness(12),
+                    Child = line
+                });
+            }
         }
 
-        if (_session.State.Routes.Count == 0)
+        if (sections.Count == 0)
         {
             RouteListPanel.Children.Add(new TextBlock { Text = "尚无路线。", Opacity = 0.68 });
         }
@@ -215,6 +277,70 @@ public sealed partial class MainWindow : Window
 
         RenderInboxDetail(visibleCaptures.SingleOrDefault(capture => capture.Id == _responsivePlanning.Inbox.SelectedItemId));
         UpdatePlanningLayout(PlanningPanel.ActualWidth);
+    }
+
+    private static string SectionText(string title) => title switch
+    {
+        "Current" => "当前路线",
+        "Paused" => "已暂停",
+        "Draft" => "草稿",
+        "Completed" => "已完成",
+        _ => title
+    };
+
+    private static void AddPausedContext(StackPanel target, RouteListItem item)
+    {
+        var context = new StackPanel { Spacing = 3, Margin = new Thickness(0, 2, 0, 0) };
+        AddContextLine(context, "完成标准", item.CompletionStandard);
+        AddContextLine(context, "不要做", item.DoNotDo);
+        AddContextLine(context, "暂停备注", item.PauseNote);
+        AddContextLine(context, "预设备选动作", item.FallbackAction);
+        target.Children.Add(new Border
+        {
+            Background = new SolidColorBrush(Colors.Honeydew),
+            BorderBrush = new SolidColorBrush(Colors.LightGray),
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(6),
+            Padding = new Thickness(10),
+            Child = context
+        });
+    }
+
+    private static void AddContextLine(StackPanel target, string label, string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return;
+        }
+
+        target.Children.Add(new TextBlock
+        {
+            Text = $"{label}：{value}",
+            TextWrapping = TextWrapping.Wrap,
+            Opacity = 0.78
+        });
+    }
+
+    private void RoutesByStatusButton_Click(object sender, RoutedEventArgs e)
+    {
+        SetSelected(RoutesByStatusButton, true);
+        SetSelected(RoutesByProjectButton, false);
+        RenderPlanning();
+    }
+
+    private void TogglePausedRouteButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (!TryReadTag(sender, out var routeId))
+        {
+            return;
+        }
+
+        if (!_expandedPausedRoutes.Add(routeId))
+        {
+            _expandedPausedRoutes.Remove(routeId);
+        }
+
+        RenderPlanning();
     }
 
     private void RenderInboxDetail(CaptureEntry? capture)

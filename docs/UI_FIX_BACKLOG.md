@@ -222,9 +222,9 @@ Guide、无活动路线、设置、Capture 和底部按钮使用固定宽度。�
 
 ## UI-005：按规格重构路线列表的信息层级
 
-- **状态：** 待认领
-- **认领者：**
-- **认领时间：**
+- **状态：** 进行中
+- **认领者：** Codex UI-005 route list information hierarchy
+- **认领时间：** 2026-09-04 00:00 +08:00
 - **体量：** 大
 - **风险：** 中
 - **推荐等级：** B
@@ -250,7 +250,11 @@ Guide、无活动路线、设置、Capture 和底部按钮使用固定宽度。�
 
 ### 结果
 
-待填写。
+- **状态：** 进行中（状态分组与暂停上下文已完成；项目分组被领域模型阻塞）
+- **修改文件：** `src/ExecutionContinuity.App/RouteListPresentation.cs`、`src/ExecutionContinuity.App/MainWindow.xaml`、`src/ExecutionContinuity.App/MainWindow.xaml.cs`、`tests/ExecutionContinuity.App.Tests/ExecutionSessionTests.cs`、`docs/MANUAL_ACCEPTANCE.md`。
+- **已完成：** Routes 按 Current、Paused、Draft、Completed 分组；Paused 按最新有效返回锚点倒序；路线行显示下一动作、暂停时间和步骤进度；展开仅显示完成标准、边界、暂停备注和预设备选动作；展开、选择和分组展示不调用路线状态转换。
+- **明确阻塞：** 当前 `Route` 领域模型没有项目归属字段，按项目无法真实实现。UI 保留“按项目”位置但禁用，并说明模型缺口；没有伪造项目数据。待项目模型和持久化字段确定后再补齐该视图。
+- **自动化验证：** 新增路线列表展示模型和 UI 契约测试；聚焦 Routes 测试 4/4 通过。
 
 ## UI-006：将 Inbox 和语言设置占位内容改为真实控件
 

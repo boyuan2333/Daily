@@ -52,9 +52,10 @@
 ## 当前基线
 
 - `dotnet build ExecutionContinuity.slnx --no-restore --verbosity minimal`：通过，0 个警告，0 个错误。
-- `dotnet test ExecutionContinuity.slnx --no-build --verbosity minimal`：通过，App 24、Domain 22、Persistence 5，共 51 个测试。
+- `dotnet test ExecutionContinuity.slnx --no-build --verbosity minimal`：通过，App 60、Domain 43、Persistence 9，共 112 个测试。
 - 实际窗口基线：隔离 fixture 下的 `Daily` 窗口探针通过；UI-004 已完成 default、520x680 和 1280x760 的真实窗口验收与截图。尚未实现的任务不包含在该验收结论中；仓库中的 Stitch 图片仍只是参考图。
 - 工作区存在未提交修改。任何 Session 都必须先检查 `git status --short`，不得覆盖无关改动。
+- 2026-09-21 维护记录（D1/E-1 切片）：`Route` 已具备可选项目字段与 `Project` 实体，因此 UI-005 的「按项目」和 UI-006 的项目搜索阻塞已解除；UI-005、UI-006 均按已完成处理。同时新增 Planning 四板块外壳（任务 / 路线与任务流 / 收件箱 / 回顾）、任务板块（日历与任务列表）、任务流蓝图与实例、以及读取 `AppState.History` 的只读回顾时间线；对应验收见 `ACCEPTANCE.md` AC-29 至 AC-33。上文「能力等级」与「使用方式」两节仍保留 2026-08 的历史写法，尚未按 P1 审计建议收敛。
 
 ## 任务总览
 
@@ -64,8 +65,8 @@
 | UI-002 | 为归档内容提供可逆恢复界面 | 大 | 高 | C | 待认领 | 无 |
 | UI-003 | 锁定 Capture 抽屉的原始上下文 | 中 | 高 | C | 已完成 | 无 |
 | UI-004 | 实现真正的窄窗口导航与自适应布局 | 大 | 中 | B | 已完成 | UI-001 建议先完成 |
-| UI-005 | 按规格重构路线列表的信息层级 | 大 | 中 | B | 待认领 | UI-001 建议先完成 |
-| UI-006 | 将 Inbox 和语言设置占位内容改为真实控件 | 大 | 中 | B | 进行中 | UI-001 建议先完成 |
+| UI-005 | 按规格重构路线列表的信息层级 | 大 | 中 | B | 已完成 | UI-001 建议先完成 |
+| UI-006 | 将 Inbox 和语言设置占位内容改为真实控件 | 大 | 中 | B | 已完成 | UI-001 建议先完成 |
 | UI-007 | 修复 Guide 主动作卡片内边距 | 小 | 低 | A | 已完成 | 无 |
 | UI-008 | 补齐关键 UI 行为的自动化与手工验收脚本 | 中 | 中 | B | 待认领 | 跟随对应修复任务 |
 

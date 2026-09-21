@@ -291,10 +291,10 @@
 **then** the same `Guide | Planning` segmented control appears in the same location and clearly indicates the current mode.
 
 **Given** Planning is selected,
-**then** Routes, Inbox, and Archive navigation is available and Settings remains a separate application-level entry.
+**then** Tasks, Routes, Inbox, and Review navigation is available with Archive as a secondary entry, and Settings remains a separate application-level entry.
 
 **Given** Guide is selected,
-**then** Routes, Inbox, and Archive navigation is hidden while the global Capture control remains available.
+**then** the Planning destination navigation is hidden while the global Capture control remains available.
 
 **When** the user switches between Guide and Planning through the segmented control,
 **then** the transition is brief, the control does not move, and no route is paused, completed, activated, or switched as a consequence of changing mode alone.
@@ -303,8 +303,11 @@
 
 ## AC-22: Planning Entry Respects The Explicit Entry Point
 
-**Given** the user selects Planning normally for the first time,
-**then** Planning opens Routes.
+**Given** the user selects Planning normally for the first time and a route is active,
+**then** Planning opens the Tasks board.
+
+**Given** the user selects Planning normally for the first time and no route is active,
+**then** Planning opens Routes with resume-or-create actions available.
 
 **Given** the user previously used a Planning destination and its local position remains valid,
 **when** the user later selects Planning normally,
@@ -434,3 +437,76 @@
 **then** a restrained no-results state appears without recommendations, inferred ranking, automatic state changes, or content deletion.
 
 **Tests:** local search and filter UI tests; archived-content separation test; domain-state comparison before and after search; manual no-results and no-recommendation inspection.
+
+## AC-29: The Task Board Projects One Task Collection
+
+**Given** routes contain unfinished steps,
+**when** the user opens the Tasks board,
+**then** every unfinished step of every non-archived route appears once as a task with its route context, steps without a completion standard are marked not ready, and completed steps and archived routes are absent.
+
+**Given** the user switches between the calendar and task-list views or types a search query,
+**when** the board re-renders,
+**then** both views project the same task collection, results keep a stable order, and `activeRouteId`, `currentStepId`, route lifecycle, step completion, and snapshots are unchanged.
+
+**Tests:** presentation tests for projection, readiness, ordering, and search; domain-state comparison before and after viewing or searching; manual empty-state and no-result inspection.
+
+## AC-30: Planned Dates Organize Tasks Without Reordering Routes
+
+**Given** a step has no planned date,
+**then** it remains unscheduled rather than receiving a fabricated date.
+
+**Given** steps have planned dates,
+**when** the calendar view is displayed,
+**then** dated tasks are grouped by date in ascending order, the all-day row precedes timed tasks on the same day, unscheduled tasks stay in a single same-page `Unscheduled` region, and step order inside every route is unchanged.
+
+**Given** a planned time is supplied without a planned date,
+**then** the change is rejected.
+
+**Tests:** domain tests for date assignment and the time-without-date rule; presentation tests for bucketing and ordering; state comparison before and after date edits; manual calendar and unscheduled-region inspection.
+
+## AC-31: Task Flows Reuse A Blueprint Through Route Instances
+
+**Given** a task flow exists and has no unfinished instance,
+**when** the user explicitly starts the group,
+**then** exactly one route instance is created from the blueprint and becomes the only active route.
+
+**Given** a task flow already has an unfinished instance,
+**when** the user starts the group again,
+**then** the existing instance is resumed instead of a second instance being created, and no self-referential return anchor is written.
+
+**Given** the user edits or adds a blueprint after an instance exists,
+**then** the existing instance's steps, completion state, return anchor, and history are unchanged.
+
+**Given** a route's steps exist and nothing is active,
+**when** the user saves the route as a task flow,
+**then** a blueprint is added with copied step content and no instance is created or activated.
+
+**Tests:** domain tests for instance creation, resume-without-duplication, blueprint/instance isolation, and copy-from-route; persistence restart test; manual start, continue, and re-start inspection.
+
+## AC-32: Review Shows Only Recorded Facts
+
+**Given** the user has started, resumed, paused, or completed work,
+**when** the user opens Review,
+**then** a read-only timeline lists exactly the recorded facts newest first with the recorded time, and no entry is derived from a snapshot, step completion flag, or elapsed time.
+
+**Given** no fact has been recorded,
+**then** Review shows a neutral empty state and does not fabricate counts, streaks, or durations.
+
+**Given** the user views, scrolls, or reopens Review,
+**then** `activeRouteId`, `currentStepId`, route lifecycle, steps, snapshots, and captures are unchanged, and no scoring, ranking, reminder, or reward is presented.
+
+**Tests:** presentation tests for ordering, empty state, and absence of snapshot-derived facts; domain assertion that capture records no history; manual inspection for no scoring or inference.
+
+## AC-33: Planning Shell Exposes Every Destination Without Changing Execution
+
+**Given** Planning is open,
+**when** the user opens Tasks, Routes, Inbox, Review, and Archive in turn,
+**then** each destination shows its own workspace and exactly one navigation entry is marked selected.
+
+**Given** the window is narrow,
+**then** the side rail is replaced by a single compact navigation row and every destination remains reachable.
+
+**Given** the user changes destination, view, or grouping,
+**then** `activeRouteId`, `currentStepId`, route lifecycle, steps, snapshots, and captures are unchanged, and the other sections' list context is preserved.
+
+**Tests:** presentation-state tests for destination and context preservation; UI/XAML tests for the navigation shell; domain-state comparison before and after navigation; manual narrow-width inspection.

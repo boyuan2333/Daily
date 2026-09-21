@@ -6,7 +6,7 @@
 
 **Architecture:** Separate deterministic domain state and local persistence from the desktop presentation layer. The shell later renders a single guide action from the active route and delegates planning, capture, pause, stuck, and route-switching transitions to the domain layer.
 
-**Tech Stack:** To be confirmed. Candidate desktop stacks and persistence options appear below; no candidate is a decided dependency.
+**Tech Stack:** Confirmed — WinUI 3 on .NET 10 with SQLite through `Microsoft.Data.Sqlite.Core`. Packaging, tray, shortcut, and startup remain open candidates below.
 
 ---
 
@@ -40,6 +40,11 @@
 - Archiving is reversible; implicit deletion is prohibited and explicit deletion requires user confirmation.
 - Planning edits cannot silently invalidate the active route's newest valid snapshot; an explicit deletion retains history and requires explicit recovery-path resolution.
 - AI, if added, is user-triggered MVP-3 only and is not a prerequisite for MVP-0 through MVP-2.
+- Planning is organized as four sections — Tasks, Routes (with Task Flows), Inbox, and Review — with Archive as a secondary entry and Settings at application level. Changing destination, view, or grouping never changes execution state.
+- A task is the Planning projection of a step; the calendar view and the task list project the same step collection and never hold a second completion state. A step may carry an optional planned date and time; records without a date stay unscheduled and are never back-filled.
+- Each route may reference at most one optional project by name; project grouping and search are organizational only.
+- Execution facts (route started, route resumed, step completed, route completed, paused) are recorded as append-only history. Review is read-only and never derives an entry from a snapshot, a completion flag, or elapsed time.
+- A task flow is a reusable step blueprint; starting it creates one Route instance, and an unfinished instance is resumed rather than duplicated. Editing a blueprint never rewrites existing instances.
 
 ### Confirmed Technical Decisions
 
@@ -69,16 +74,17 @@
 
 1. Define route persistence data, nullable application execution state (`activeRouteId`, `currentStepId`), immutable historical snapshots, captures, archives, and lifecycle transitions.
 2. Write failing domain tests for the bidirectional `activeRouteId`/active-lifecycle invariant, final-step completion, snapshot completeness, capture with and without a snapshot, active-route-only recovery, fallback return semantics, protected snapshot references during planning edits, and planning-only route switching.
-3. Implement the smallest local persistence adapter behind a storage interface, after resolving the SQLite-versus-JSON question.
+3. Implement the confirmed SQLite persistence adapter behind a storage interface.
 4. Add integration tests that close/recreate the application state and verify capture and snapshot recovery.
 5. Do not build a desktop UI, tray integration, or AI dependency before these state and recovery guarantees pass.
 
 ### MVP-1: Planning and Guided Execution
 
-1. Add planning surfaces for creating/editing routes, ordered steps, completion standards, `do not do` boundaries, fallback actions, paused-route inspection/resume, and inbox conversion/archive.
-2. Add guide mode that derives only the active route's current action.
-3. Add durable capture in both active-route and no-active-route guide states, pause/resume, stuck/fallback, no-fallback single-sentence block, final route completion, and planning-owned route choice and activation.
-4. Add UI and manual acceptance coverage for AC-01 through AC-28, excluding MVP-2 shell behavior.
+1. Add planning surfaces for creating/editing routes, ordered steps, completion standards, `do not do` boundaries, fallback actions, planned dates, project assignment, paused-route inspection/resume, and inbox conversion/archive.
+2. Add the Tasks board (calendar and task list), the Task Flows blueprint library, and the read-only Review timeline.
+3. Add guide mode that derives only the active route's current action.
+4. Add durable capture in both active-route and no-active-route guide states, pause/resume, stuck/fallback, no-fallback single-sentence block, final route completion, and planning-owned route choice and activation.
+5. Add UI and manual acceptance coverage for AC-01 through AC-33, excluding MVP-2 shell behavior.
 
 ### MVP-2: Windows Presence
 

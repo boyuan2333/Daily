@@ -58,9 +58,11 @@ The feedback is informational rather than celebratory: no confetti, points, soun
 
 Planning is a structured workspace rather than one long page. Its primary destinations are:
 
-- **Routes:** active, paused, and draft route management;
+- **Tasks:** the calendar view and a task list over the same task collection;
+- **Routes:** active, paused, and draft route management, plus the Task Flows blueprint library;
 - **Inbox:** captured ideas and their management actions;
-- **Archive:** reversible access to archived routes and captures;
+- **Review:** a read-only timeline of recorded execution facts;
+- **Archive:** a secondary entry for reversible access to archived routes and captures;
 - **Settings:** language and other application preferences, separate from core execution controls.
 
 Settings must support at least Simplified Chinese and English. Language selection must not share the main execution surface with Guide or route controls.
@@ -157,7 +159,7 @@ Inbox includes a local search field and a compact `All | Unorganized | Organized
 
 Guide and Planning use a fixed `Guide | Planning` segmented control. It occupies the same top-bar location in both environments and clearly indicates the selected mode.
 
-- In Planning, an internal navigation rail exposes Routes, Inbox, and Archive.
+- In Planning, an internal navigation rail exposes Tasks, Routes (with Task Flows), Inbox, and Review, with Archive as a secondary entry below a divider. At narrow widths the rail is replaced by one compact navigation row.
 - In Guide, the internal Planning navigation is hidden so route and content choices do not compete with the current action.
 - Settings uses a separate gear entry at application level. Language controls remain inside Settings rather than the execution surface.
 - The global bottom Capture action remains available in both modes.
@@ -170,7 +172,7 @@ Changing the selected mode only changes presentation. It never pauses, completes
 
 Planning chooses its initial destination from the explicit entry point:
 
-- A first ordinary selection of `Planning` opens Routes.
+- A first ordinary selection of `Planning` opens the Tasks board when a route is active, and Routes when no route is active.
 - Later ordinary selections restore the most recent Planning destination, scroll position, and local selection where still valid.
 - `Pause and choose another route` always opens Routes with Paused in focus.
 - With no active route, entering Planning opens Routes and makes resume-or-create actions immediately available.

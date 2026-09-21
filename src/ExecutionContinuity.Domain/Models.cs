@@ -23,6 +23,60 @@ public enum LanguagePreference
     English
 }
 
+public sealed record Project(Guid Id, string Name)
+{
+    public static Project Create(string name)
+    {
+        var trimmed = name?.Trim() ?? string.Empty;
+        if (trimmed.Length == 0)
+        {
+            throw new ArgumentException("A project name cannot be empty.", nameof(name));
+        }
+
+        return new Project(Guid.NewGuid(), trimmed);
+    }
+}
+
+public sealed record TaskFlowStep(
+    Guid Id,
+    int Position,
+    string Action,
+    string CompletionStandard,
+    string DoNotDo,
+    string? FallbackAction)
+{
+    public static TaskFlowStep Create(
+        string action,
+        string completionStandard,
+        string doNotDo,
+        string? fallbackAction = null) =>
+        new(Guid.NewGuid(), 0, action, completionStandard, doNotDo, fallbackAction);
+}
+
+public sealed record TaskFlow(
+    Guid Id,
+    string Title,
+    IReadOnlyList<TaskFlowStep> Steps,
+    Guid? ProjectId = null)
+{
+    public static TaskFlow Create(string title, IEnumerable<TaskFlowStep> steps)
+    {
+        var trimmed = title?.Trim() ?? string.Empty;
+        if (trimmed.Length == 0)
+        {
+            throw new ArgumentException("A task flow title cannot be empty.", nameof(title));
+        }
+
+        var ordered = steps.Select((step, index) => step with { Position = index }).ToArray();
+        if (ordered.Length == 0)
+        {
+            throw new ArgumentException("A task flow requires at least one step.", nameof(steps));
+        }
+
+        return new TaskFlow(Guid.NewGuid(), trimmed, ordered);
+    }
+}
+
 public sealed record Step(
     Guid Id,
     int Position,
@@ -30,28 +84,37 @@ public sealed record Step(
     string CompletionStandard,
     string DoNotDo,
     string? FallbackAction,
-    bool IsCompleted)
+    bool IsCompleted,
+    DateOnly? PlannedDate = null,
+    TimeOnly? PlannedTime = null)
 {
     public static Step Create(
         string action,
         string completionStandard,
         string doNotDo,
-        string? fallbackAction = null) =>
-        new(Guid.NewGuid(), 0, action, completionStandard, doNotDo, fallbackAction, false);
+        string? fallbackAction = null,
+        DateOnly? plannedDate = null,
+        TimeOnly? plannedTime = null) =>
+        new(Guid.NewGuid(), 0, action, completionStandard, doNotDo, fallbackAction, false, plannedDate, plannedTime);
 }
 
 public sealed record Route(
     Guid Id,
     string Title,
     IReadOnlyList<Step> Steps,
-    RouteLifecycle Lifecycle)
+    RouteLifecycle Lifecycle,
+    Guid? ProjectId = null,
+    Guid? SourceTaskFlowId = null)
 {
-    public static Route Create(string title, params Step[] steps) =>
+    public static Route Create(string title, params Step[] steps) => Create(title, null, steps);
+
+    public static Route Create(string title, Guid? projectId, IEnumerable<Step> steps) =>
         new(
             Guid.NewGuid(),
             title,
             steps.Select((step, index) => step with { Position = index }).ToArray(),
-            RouteLifecycle.Draft);
+            RouteLifecycle.Draft,
+            projectId);
 
     public Step? CurrentStep() => Steps
         .Where(step => !step.IsCompleted)
@@ -77,6 +140,32 @@ public sealed record CaptureEntry(
     bool IsArchived = false,
     string? OrganizedText = null);
 
+public enum HistoryEventKind
+{
+    RouteStarted,
+    RouteResumed,
+    StepCompleted,
+    RouteCompleted,
+    Paused
+}
+
+public sealed record HistoryEvent(
+    Guid Id,
+    HistoryEventKind Kind,
+    Guid RouteId,
+    Guid? StepId,
+    string Summary,
+    DateTimeOffset OccurredAt)
+{
+    public static HistoryEvent Create(
+        HistoryEventKind kind,
+        Guid routeId,
+        Guid? stepId,
+        string summary,
+        DateTimeOffset occurredAt) =>
+        new(Guid.NewGuid(), kind, routeId, stepId, summary ?? string.Empty, occurredAt);
+}
+
 public sealed record ExecutionState(
     Guid? ActiveRouteId,
     Guid? CurrentStepId,
@@ -87,19 +176,28 @@ public sealed class AppState
     private readonly IReadOnlyList<Route> _routes;
     private readonly IReadOnlyList<ExecutionSnapshot> _snapshots;
     private readonly IReadOnlyList<CaptureEntry> _captures;
+    private readonly IReadOnlyList<Project> _projects;
+    private readonly IReadOnlyList<HistoryEvent> _history;
+    private readonly IReadOnlyList<TaskFlow> _taskFlows;
 
     private AppState(
         IReadOnlyList<Route> routes,
         ExecutionState execution,
         IReadOnlyList<ExecutionSnapshot> snapshots,
         IReadOnlyList<CaptureEntry> captures,
-        LanguagePreference languagePreference)
+        LanguagePreference languagePreference,
+        IReadOnlyList<Project> projects,
+        IReadOnlyList<HistoryEvent> history,
+        IReadOnlyList<TaskFlow> taskFlows)
     {
         _routes = routes;
         Execution = execution;
         _snapshots = snapshots;
         _captures = captures;
         LanguagePreference = languagePreference;
+        _projects = projects;
+        _history = history;
+        _taskFlows = taskFlows;
     }
 
     public IReadOnlyList<Route> Routes => _routes;
@@ -112,6 +210,12 @@ public sealed class AppState
 
     public LanguagePreference LanguagePreference { get; }
 
+    public IReadOnlyList<Project> Projects => _projects;
+
+    public IReadOnlyList<HistoryEvent> History => _history;
+
+    public IReadOnlyList<TaskFlow> TaskFlows => _taskFlows;
+
     public static AppState Create(params Route[] routes)
     {
         var state = new AppState(
@@ -119,7 +223,10 @@ public sealed class AppState
             new ExecutionState(null, null),
             Array.Empty<ExecutionSnapshot>(),
             Array.Empty<CaptureEntry>(),
-            LanguagePreference.FollowSystem);
+            LanguagePreference.FollowSystem,
+            Array.Empty<Project>(),
+            Array.Empty<HistoryEvent>(),
+            Array.Empty<TaskFlow>());
         state.ValidateInvariants();
         return state;
     }
@@ -129,7 +236,10 @@ public sealed class AppState
         ExecutionState execution,
         IEnumerable<ExecutionSnapshot> snapshots,
         IEnumerable<CaptureEntry> captures,
-        LanguagePreference languagePreference = LanguagePreference.FollowSystem)
+        LanguagePreference languagePreference = LanguagePreference.FollowSystem,
+        IEnumerable<Project>? projects = null,
+        IEnumerable<HistoryEvent>? history = null,
+        IEnumerable<TaskFlow>? taskFlows = null)
     {
         var routeArray = routes.ToArray();
         if (execution.ActiveRouteId is Guid activeRouteId)
@@ -155,7 +265,10 @@ public sealed class AppState
             execution,
             snapshots.ToArray(),
             captures.ToArray(),
-            languagePreference);
+            languagePreference,
+            projects?.ToArray() ?? Array.Empty<Project>(),
+            history?.ToArray() ?? Array.Empty<HistoryEvent>(),
+            taskFlows?.ToArray() ?? Array.Empty<TaskFlow>());
         state.ValidateInvariants();
         return state;
     }
@@ -195,20 +308,39 @@ public sealed class AppState
         ExecutionState execution,
         IReadOnlyList<ExecutionSnapshot>? snapshots = null,
         IReadOnlyList<CaptureEntry>? captures = null,
-        LanguagePreference? languagePreference = null)
+        LanguagePreference? languagePreference = null,
+        IReadOnlyList<Project>? projects = null,
+        IReadOnlyList<HistoryEvent>? history = null,
+        IReadOnlyList<TaskFlow>? taskFlows = null)
     {
         var next = new AppState(
             routes,
             execution,
             snapshots ?? Snapshots,
             captures ?? Captures,
-            languagePreference ?? LanguagePreference);
+            languagePreference ?? LanguagePreference,
+            projects ?? Projects,
+            history ?? History,
+            taskFlows ?? TaskFlows);
         next.ValidateInvariants();
         return next;
     }
 
     public void ValidateInvariants()
     {
+        if (_projects.Select(project => project.Id).Distinct().Count() != _projects.Count)
+        {
+            throw new InvalidOperationException("Project IDs must be unique.");
+        }
+
+        foreach (var route in _routes)
+        {
+            if (route.ProjectId is Guid projectId && _projects.All(project => project.Id != projectId))
+            {
+                throw new InvalidOperationException("A route can only reference a project that exists.");
+            }
+        }
+
         var activeRoutes = _routes.Where(route => route.Lifecycle == RouteLifecycle.Active).ToArray();
 
         if (Execution.ActiveRouteId is null)
@@ -252,6 +384,78 @@ public static class StateTransitions
         return state.With(state.Routes.Append(route).ToArray(), state.Execution);
     }
 
+    public static AppState AddTaskFlow(AppState state, TaskFlow flow)
+    {
+        if (state.TaskFlows.Any(existing => existing.Id == flow.Id))
+        {
+            throw new InvalidOperationException("A task flow with the same ID already exists.");
+        }
+
+        if (string.IsNullOrWhiteSpace(flow.Title) || flow.Steps.Count == 0)
+        {
+            throw new ArgumentException("A task flow requires a title and at least one step.", nameof(flow));
+        }
+
+        return state.With(
+            state.Routes,
+            state.Execution,
+            taskFlows: state.TaskFlows.Append(flow).ToArray());
+    }
+
+    public static AppState CreateTaskFlowFromRoute(AppState state, Guid routeId, string title)
+    {
+        var route = state.Route(routeId);
+        var flow = TaskFlow.Create(
+            title,
+            route.Steps.Select(step => TaskFlowStep.Create(
+                step.Action,
+                step.CompletionStandard,
+                step.DoNotDo,
+                step.FallbackAction)));
+        return AddTaskFlow(state, flow);
+    }
+
+    public static AppState StartTaskFlow(
+        AppState state,
+        Guid taskFlowId,
+        DateTimeOffset startedAt,
+        string? note = null)
+    {
+        var flow = state.TaskFlows.SingleOrDefault(item => item.Id == taskFlowId)
+            ?? throw new InvalidOperationException("The task flow does not exist.");
+
+        var unfinished = state.Routes
+            .Where(route => route.SourceTaskFlowId == flow.Id)
+            .FirstOrDefault(route => route.Lifecycle is
+                RouteLifecycle.Draft or RouteLifecycle.Active or RouteLifecycle.Paused);
+        if (unfinished is not null)
+        {
+            return state.Execution.ActiveRouteId == unfinished.Id
+                ? state
+                : SelectActiveRoute(state, unfinished.Id, startedAt, note);
+        }
+
+        var instance = new Route(
+            Guid.NewGuid(),
+            flow.Title,
+            flow.Steps
+                .OrderBy(step => step.Position)
+                .Select((step, index) => new Step(
+                    Guid.NewGuid(),
+                    index,
+                    step.Action,
+                    step.CompletionStandard,
+                    step.DoNotDo,
+                    step.FallbackAction,
+                    false))
+                .ToArray(),
+            RouteLifecycle.Draft,
+            flow.ProjectId,
+            flow.Id);
+
+        return SelectActiveRoute(AddRoute(state, instance), instance.Id, startedAt, note);
+    }
+
     public static AppState UpdateRoute(
         AppState state,
         Guid routeId,
@@ -286,6 +490,70 @@ public static class StateTransitions
         return state.With(
             state.Routes.Select(item => item.Id == routeId ? updated : item).ToArray(),
             state.Execution);
+    }
+
+    public static AppState SetStepDate(
+        AppState state,
+        Guid routeId,
+        Guid stepId,
+        DateOnly? plannedDate,
+        TimeOnly? plannedTime)
+    {
+        var route = state.Route(routeId);
+        if (route.Steps.All(step => step.Id != stepId))
+        {
+            throw new InvalidOperationException("The step does not belong to the route.");
+        }
+
+        if (plannedDate is null && plannedTime is not null)
+        {
+            throw new ArgumentException("A planned time requires a planned date.", nameof(plannedTime));
+        }
+
+        return state.With(
+            state.Routes
+                .Select(item => item.Id == routeId
+                    ? item with
+                    {
+                        Steps = item.Steps
+                            .Select(step => step.Id == stepId
+                                ? step with { PlannedDate = plannedDate, PlannedTime = plannedTime }
+                                : step)
+                            .ToArray()
+                    }
+                    : item)
+                .ToArray(),
+            state.Execution);
+    }
+
+    public static AppState SetRouteProject(AppState state, Guid routeId, string? projectName)
+    {
+        state.Route(routeId);
+        var normalized = string.IsNullOrWhiteSpace(projectName) ? null : projectName.Trim();
+        if (normalized is null)
+        {
+            return state.With(
+                state.Routes
+                    .Select(item => item.Id == routeId ? item with { ProjectId = null } : item)
+                    .ToArray(),
+                state.Execution);
+        }
+
+        var project = state.Projects.FirstOrDefault(candidate =>
+            string.Equals(candidate.Name, normalized, StringComparison.OrdinalIgnoreCase));
+        var projects = state.Projects;
+        if (project is null)
+        {
+            project = Project.Create(normalized);
+            projects = projects.Append(project).ToArray();
+        }
+
+        return state.With(
+            state.Routes
+                .Select(item => item.Id == routeId ? item with { ProjectId = project.Id } : item)
+                .ToArray(),
+            state.Execution,
+            projects: projects);
     }
 
     public static AppState ArchiveRoute(AppState state, Guid routeId)
@@ -353,6 +621,7 @@ public static class StateTransitions
         }
 
         var snapshots = state.Snapshots;
+        var history = state.History;
         if (switchedAt is not null &&
             state.Execution.ActiveRouteId is Guid previousRouteId &&
             state.Execution.CurrentStepId is Guid previousStepId)
@@ -369,7 +638,26 @@ public static class StateTransitions
                 previousStep.FallbackAction,
                 switchedAt.Value,
                 note)).ToArray();
+            history = history.Append(HistoryEvent.Create(
+                HistoryEventKind.Paused,
+                previousRoute.Id,
+                previousStep.Id,
+                previousRoute.Title,
+                switchedAt.Value)).ToArray();
         }
+
+        if (switchedAt is not null && selected.Lifecycle is RouteLifecycle.Draft or RouteLifecycle.Paused)
+        {
+            history = history.Append(HistoryEvent.Create(
+                selected.Lifecycle == RouteLifecycle.Paused
+                    ? HistoryEventKind.RouteResumed
+                    : HistoryEventKind.RouteStarted,
+                selected.Id,
+                selected.CurrentStep()?.Id,
+                selected.Title,
+                switchedAt.Value)).ToArray();
+        }
+
         var routes = state.Routes
             .Select(route => route with
             {
@@ -385,7 +673,8 @@ public static class StateTransitions
         return state.With(
             routes,
             new ExecutionState(routeId, currentStepId),
-            snapshots);
+            snapshots,
+            history: history);
     }
 
     public static AppState Capture(AppState state, string rawText, DateTimeOffset capturedAt)
@@ -443,7 +732,13 @@ public static class StateTransitions
         return state.With(
             state.Routes,
             state.Execution,
-            state.Snapshots.Append(snapshot).ToArray());
+            state.Snapshots.Append(snapshot).ToArray(),
+            history: state.History.Append(HistoryEvent.Create(
+                HistoryEventKind.Paused,
+                route.Id,
+                step.Id,
+                route.Title,
+                pausedAt)).ToArray());
     }
 
     public static AppState RecordBlockAndPause(
@@ -477,7 +772,7 @@ public static class StateTransitions
             state.Execution with { Mode = ExecutionMode.Normal });
     }
 
-    public static AppState CompleteCurrentStep(AppState state)
+    public static AppState CompleteCurrentStep(AppState state, DateTimeOffset completedAt)
     {
         if (state.Execution.Mode != ExecutionMode.Normal)
         {
@@ -489,8 +784,9 @@ public static class StateTransitions
         var stepId = state.Execution.CurrentStepId
             ?? throw new InvalidOperationException("Cannot complete without a current step.");
         var route = state.Route(routeId);
+        var step = route.Steps.Single(candidate => candidate.Id == stepId);
         var steps = route.Steps
-            .Select(step => step.Id == stepId ? step with { IsCompleted = true } : step)
+            .Select(candidate => candidate.Id == stepId ? candidate with { IsCompleted = true } : candidate)
             .ToArray();
         var updated = route with { Steps = steps };
         var nextStep = updated.CurrentStep();
@@ -501,7 +797,21 @@ public static class StateTransitions
                     ? updated with { Lifecycle = RouteLifecycle.Completed }
                     : item)
                 .ToArray();
-            return state.With(completed, new ExecutionState(null, null));
+            var history = state.History
+                .Append(HistoryEvent.Create(
+                    HistoryEventKind.StepCompleted,
+                    routeId,
+                    stepId,
+                    step.Action,
+                    completedAt))
+                .Append(HistoryEvent.Create(
+                    HistoryEventKind.RouteCompleted,
+                    routeId,
+                    stepId,
+                    route.Title,
+                    completedAt))
+                .ToArray();
+            return state.With(completed, new ExecutionState(null, null), history: history);
         }
 
         var active = state.Routes
@@ -509,7 +819,15 @@ public static class StateTransitions
                 ? updated with { Lifecycle = RouteLifecycle.Active }
                 : item)
             .ToArray();
-        return state.With(active, new ExecutionState(routeId, nextStep.Id));
+        return state.With(
+            active,
+            new ExecutionState(routeId, nextStep.Id),
+            history: state.History.Append(HistoryEvent.Create(
+                HistoryEventKind.StepCompleted,
+                routeId,
+                stepId,
+                step.Action,
+                completedAt)).ToArray());
     }
 
     public static AppState StartFallback(AppState state)

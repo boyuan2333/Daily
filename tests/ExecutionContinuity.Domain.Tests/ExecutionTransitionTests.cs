@@ -70,7 +70,9 @@ public sealed class ExecutionTransitionTests
         var route = Route.Create("Route", Step.Create("Action", "Done", "Boundary"));
         var state = StateTransitions.SelectActiveRoute(AppState.Create(route), route.Id);
 
-        var completed = StateTransitions.CompleteCurrentStep(state);
+        var completed = StateTransitions.CompleteCurrentStep(
+            state,
+            new DateTimeOffset(2026, 7, 25, 12, 0, 0, TimeSpan.Zero));
 
         Assert.True(completed.Route(route.Id).Steps.Single().IsCompleted);
         Assert.Equal(RouteLifecycle.Completed, completed.Route(route.Id).Lifecycle);

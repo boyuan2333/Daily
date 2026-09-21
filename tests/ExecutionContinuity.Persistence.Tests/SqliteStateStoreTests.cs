@@ -17,7 +17,9 @@ public sealed class SqliteStateStoreTests
             var state = StateTransitions.SelectActiveRoute(
                 AppState.Create(completedRoute, otherRoute),
                 completedRoute.Id);
-            state = StateTransitions.CompleteCurrentStep(state);
+            state = StateTransitions.CompleteCurrentStep(
+                state,
+                new DateTimeOffset(2026, 7, 25, 12, 0, 0, TimeSpan.Zero));
 
             await new SqliteStateStore(path).SaveAsync(state);
             var recovered = await new SqliteStateStore(path).LoadAsync();

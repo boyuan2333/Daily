@@ -61,17 +61,54 @@ public sealed class ExecutionSession
         CommitAsync(StateTransitions.CompleteFallback, cancellationToken);
 
     public Task CompleteCurrentStepAsync(CancellationToken cancellationToken = default) =>
-        CommitAsync(StateTransitions.CompleteCurrentStep, cancellationToken);
+        CommitAsync(state => StateTransitions.CompleteCurrentStep(state, DateTimeOffset.Now), cancellationToken);
 
-    public Task AddRouteAsync(Route route, CancellationToken cancellationToken = default) =>
-        CommitAsync(state => StateTransitions.AddRoute(state, route), cancellationToken);
+    public Task AddRouteAsync(
+        Route route,
+        string? projectName = null,
+        CancellationToken cancellationToken = default) =>
+        CommitAsync(
+            state => StateTransitions.SetRouteProject(
+                StateTransitions.AddRoute(state, route),
+                route.Id,
+                projectName),
+            cancellationToken);
 
     public Task UpdateRouteAsync(
         Guid routeId,
         string title,
         IReadOnlyList<Step> steps,
+        string? projectName = null,
         CancellationToken cancellationToken = default) =>
-        CommitAsync(state => StateTransitions.UpdateRoute(state, routeId, title, steps), cancellationToken);
+        CommitAsync(
+            state => StateTransitions.SetRouteProject(
+                StateTransitions.UpdateRoute(state, routeId, title, steps),
+                routeId,
+                projectName),
+            cancellationToken);
+
+    public Task SetRouteProjectAsync(
+        Guid routeId,
+        string? projectName,
+        CancellationToken cancellationToken = default) =>
+        CommitAsync(state => StateTransitions.SetRouteProject(state, routeId, projectName), cancellationToken);
+
+    public Task AddTaskFlowAsync(TaskFlow flow, CancellationToken cancellationToken = default) =>
+        CommitAsync(state => StateTransitions.AddTaskFlow(state, flow), cancellationToken);
+
+    public Task CreateTaskFlowFromRouteAsync(
+        Guid routeId,
+        string title,
+        CancellationToken cancellationToken = default) =>
+        CommitAsync(state => StateTransitions.CreateTaskFlowFromRoute(state, routeId, title), cancellationToken);
+
+    public Task StartTaskFlowAsync(
+        Guid taskFlowId,
+        string? note = null,
+        CancellationToken cancellationToken = default) =>
+        CommitAsync(
+            state => StateTransitions.StartTaskFlow(state, taskFlowId, DateTimeOffset.Now, note),
+            cancellationToken);
 
     public Task ArchiveRouteAsync(Guid routeId, CancellationToken cancellationToken = default) =>
         CommitAsync(state => StateTransitions.ArchiveRoute(state, routeId), cancellationToken);
@@ -82,12 +119,18 @@ public sealed class ExecutionSession
     public Task ConvertCaptureToRouteAsync(
         Guid captureId,
         Route route,
+        string? projectName = null,
         CancellationToken cancellationToken = default) =>
-        CommitAsync(state => StateTransitions.ConvertCaptureToRoute(state, captureId, route), cancellationToken);
+        CommitAsync(
+            state => StateTransitions.SetRouteProject(
+                StateTransitions.ConvertCaptureToRoute(state, captureId, route),
+                route.Id,
+                projectName),
+            cancellationToken);
 
     public Task ActivateRouteAsync(Guid routeId, string? note = null, CancellationToken cancellationToken = default) =>
         CommitAsync(
-            state => state.Execution.ActiveRouteId is null || state.Execution.ActiveRouteId == routeId
+            state => state.Execution.ActiveRouteId == routeId
                 ? StateTransitions.SelectActiveRoute(state, routeId)
                 : StateTransitions.SelectActiveRoute(state, routeId, DateTimeOffset.Now, note),
             cancellationToken);

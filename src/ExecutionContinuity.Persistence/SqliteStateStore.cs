@@ -87,12 +87,31 @@ public sealed class SqliteStateStore
         ExecutionState Execution,
         IReadOnlyList<ExecutionSnapshot> Snapshots,
         IReadOnlyList<CaptureEntry> Captures,
-        LanguagePreference LanguagePreference = LanguagePreference.FollowSystem)
+        LanguagePreference LanguagePreference = LanguagePreference.FollowSystem,
+        IReadOnlyList<Project>? Projects = null,
+        IReadOnlyList<HistoryEvent>? History = null,
+        IReadOnlyList<TaskFlow>? TaskFlows = null)
     {
         public static StateDocument From(AppState state) =>
-            new(state.Routes, state.Execution, state.Snapshots, state.Captures, state.LanguagePreference);
+            new(
+                state.Routes,
+                state.Execution,
+                state.Snapshots,
+                state.Captures,
+                state.LanguagePreference,
+                state.Projects,
+                state.History,
+                state.TaskFlows);
 
         public AppState ToState() =>
-            AppState.Restore(Routes, Execution, Snapshots, Captures, LanguagePreference);
+            AppState.Restore(
+                Routes,
+                Execution,
+                Snapshots,
+                Captures,
+                LanguagePreference,
+                Projects,
+                History,
+                TaskFlows);
     }
 }

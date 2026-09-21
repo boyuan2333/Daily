@@ -184,7 +184,7 @@ public sealed class ExecutionSessionTests
         Assert.Contains("x:Name=\"CaptureInputSurface\"", xaml);
         Assert.Contains("Background=\"#FFFFFF\" BorderBrush=\"#B8C4B9\" BorderThickness=\"1\" CornerRadius=\"8\"", xaml);
         Assert.Contains("x:Name=\"RouteTitleInput\" Background=\"Transparent\" BorderThickness=\"0\"", xaml);
-        Assert.Equal(8, xaml.Split("Background=\"Transparent\" BorderThickness=\"0\" Padding=\"14,10\" FontFamily=\"Microsoft YaHei UI\" FontSize=\"15\"").Length - 1);
+        Assert.Equal(9, xaml.Split("Background=\"Transparent\" BorderThickness=\"0\" Padding=\"14,10\" FontFamily=\"Microsoft YaHei UI\" FontSize=\"15\"").Length - 1);
         Assert.Contains("x:Name=\"RouteListColumn\"", xaml);
         Assert.Contains("x:Name=\"RouteEditorRow\"", xaml);
         Assert.Contains("SizeChanged=\"PlanningPanel_SizeChanged\"", xaml);
@@ -241,18 +241,21 @@ public sealed class ExecutionSessionTests
         Assert.Contains("x:Name=\"InboxBackButton\"", xaml);
         Assert.Contains("x:Name=\"RouteListScrollViewer\"", xaml);
         Assert.Contains("x:Name=\"InboxListScrollViewer\"", xaml);
-        Assert.Contains("x:Name=\"CompactRoutesNavigation\"", xaml);
-        Assert.Contains("x:Name=\"CompactInboxNavigation\"", xaml);
-        Assert.Contains("x:Name=\"CompactArchiveNavigation\"", xaml);
+        Assert.Contains("x:Name=\"CompactPlanningNavigation\"", xaml);
+        Assert.Contains("x:Name=\"CompactTasksNavButton\"", xaml);
+        Assert.Contains("x:Name=\"CompactRoutesNavButton\"", xaml);
+        Assert.Contains("x:Name=\"CompactInboxNavButton\"", xaml);
+        Assert.Contains("x:Name=\"CompactReviewNavButton\"", xaml);
+        Assert.Contains("x:Name=\"CompactArchiveNavButton\"", xaml);
         Assert.Contains("MaxWidth=\"760\"", xaml);
         Assert.Contains("MaxWidth=\"520\"", xaml);
         Assert.Contains("MaxWidth=\"410\"", xaml);
         Assert.Contains("RouteBackButton_Click", code);
         Assert.Contains("InboxBackButton_Click", code);
         Assert.Contains("AutomationProperties.SetName(select, preview)", code);
-        Assert.Contains("CompactRoutesNavigation.Visibility", code);
-        Assert.Contains("CompactInboxNavigation.Visibility", code);
-        Assert.Contains("CompactArchiveNavigation.Visibility", code);
+        Assert.Contains("CompactPlanningNavigation.Visibility", code);
+        Assert.Contains("TasksNavButton_Click", code);
+        Assert.Contains("ReviewNavButton_Click", code);
         Assert.Contains("ResponsivePlanningPresentation", code);
     }
 
@@ -553,7 +556,7 @@ public sealed class ExecutionSessionTests
     }
 
     [Fact]
-    public void Routes_ui_exposes_status_grouping_and_declares_project_grouping_unavailable_without_project_data()
+    public void Routes_ui_exposes_status_and_project_grouping_with_project_ownership()
     {
         var root = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", ".."));
         var xaml = File.ReadAllText(Path.Combine(root, "src", "ExecutionContinuity.App", "MainWindow.xaml"));
@@ -561,8 +564,10 @@ public sealed class ExecutionSessionTests
 
         Assert.Contains("x:Name=\"RoutesByStatusButton\"", xaml);
         Assert.Contains("x:Name=\"RoutesByProjectButton\"", xaml);
-        Assert.Contains("IsEnabled=\"False\"", xaml);
-        Assert.Contains("领域模型尚未提供项目归属", xaml);
+        Assert.Contains("Click=\"RoutesByProjectButton_Click\"", xaml);
+        Assert.Contains("x:Name=\"ProjectNameInput\"", xaml);
+        Assert.DoesNotContain("IsEnabled=\"False\"", xaml);
+        Assert.Contains("RouteListPresentation.GroupByProject", code);
         Assert.Contains("RouteListPresentation.GroupByStatus", code);
         Assert.Contains("RouteListPresentation.Describe", code);
         Assert.Contains("TogglePausedRouteButton_Click", code);
@@ -869,6 +874,62 @@ public sealed class ExecutionSessionTests
 
             Assert.Null(session.State.Captures.Single().OrganizedText);
             Assert.Null((await new ExecutionSession(new SqliteStateStore(path)).LoadAsync()).Captures.Single().OrganizedText);
+        }
+        finally
+        {
+            DeleteDatabase(path);
+        }
+    }
+
+    [Fact]
+    public async Task Project_assignment_persists_through_the_session_without_touching_execution_state()
+    {
+        var path = NewDatabasePath();
+        try
+        {
+            var session = new ExecutionSession(new SqliteStateStore(path));
+            await session.LoadAsync();
+            await session.AddRouteAsync(
+                Route.Create("Prepare the session", Step.Create("Check input", "Input checked", "Do not record yet")),
+                "Graduation recording");
+            var routeId = session.State.Routes.Single().Id;
+            await session.ActivateRouteAsync(routeId);
+
+            var reloaded = await new ExecutionSession(new SqliteStateStore(path)).LoadAsync();
+
+            var project = Assert.Single(reloaded.Projects);
+            Assert.Equal("Graduation recording", project.Name);
+            Assert.Equal(project.Id, reloaded.Route(routeId).ProjectId);
+            Assert.Equal(routeId, reloaded.Execution.ActiveRouteId);
+        }
+        finally
+        {
+            DeleteDatabase(path);
+        }
+    }
+
+    [Fact]
+    public async Task Session_records_history_for_start_completion_and_capture_free_of_events()
+    {
+        var path = NewDatabasePath();
+        try
+        {
+            var session = new ExecutionSession(new SqliteStateStore(path));
+            await session.LoadAsync();
+            await session.AddRouteAsync(
+                Route.Create("Prepare the session", Step.Create("Check input", "Input checked", "Do not record yet")));
+            var routeId = session.State.Routes.Single().Id;
+
+            await session.ActivateRouteAsync(routeId);
+            await session.CaptureAsync("idea while executing");
+            await session.CompleteCurrentStepAsync();
+
+            var reloaded = await new ExecutionSession(new SqliteStateStore(path)).LoadAsync();
+
+            Assert.Equal(
+                [HistoryEventKind.RouteStarted, HistoryEventKind.StepCompleted, HistoryEventKind.RouteCompleted],
+                reloaded.History.Select(item => item.Kind));
+            Assert.All(reloaded.History, item => Assert.Equal(routeId, item.RouteId));
         }
         finally
         {

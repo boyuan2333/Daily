@@ -40,6 +40,12 @@ public sealed partial class MainWindow : Window
     private InboxFilter _inboxFilter = InboxFilter.All;
     private string _inboxSearchText = string.Empty;
     private string _routeSearchText = string.Empty;
+    private bool _groupRoutesByProject;
+    private string _taskSearchText = string.Empty;
+    private TasksView _tasksView = TasksView.Calendar;
+    private TimeOnly? _editingStepPlannedTime;
+    private bool _planningDestinationChosen;
+    private RoutesSectionView _routesSectionView = RoutesSectionView.Routes;
     private TextBox? _organizedCaptureInput;
     private Guid? _organizedCaptureId;
 
@@ -135,14 +141,26 @@ public sealed partial class MainWindow : Window
 
     private void RenderPlanning()
     {
-        RoutesWorkspace.Visibility = ToVisibility(_planningDestination == PlanningDestination.Routes);
+        var routesSection = _planningDestination == PlanningDestination.Routes;
+        var showingTaskFlows = routesSection && _routesSectionView == RoutesSectionView.TaskFlows;
+        TasksWorkspace.Visibility = ToVisibility(_planningDestination == PlanningDestination.Tasks);
+        RoutesWorkspace.Visibility = ToVisibility(routesSection && !showingTaskFlows);
+        TaskFlowsWorkspace.Visibility = ToVisibility(showingTaskFlows);
         InboxWorkspace.Visibility = ToVisibility(_planningDestination == PlanningDestination.Inbox);
+        ReviewWorkspace.Visibility = ToVisibility(_planningDestination == PlanningDestination.Review);
         ArchiveWorkspace.Visibility = ToVisibility(_planningDestination == PlanningDestination.Archive);
-        SetSelected(RoutesNavButton, _planningDestination == PlanningDestination.Routes);
-        SetSelected(InboxNavButton, _planningDestination == PlanningDestination.Inbox);
-        SetSelected(ArchiveNavButton, _planningDestination == PlanningDestination.Archive);
-        SetSelected(RoutesByStatusButton, true);
-        RoutesByProjectButton.IsEnabled = false;
+        SyncNavigationSelection();
+        SetSelected(RoutesListViewButton, _routesSectionView == RoutesSectionView.Routes);
+        SetSelected(TaskFlowsListViewButton, _routesSectionView == RoutesSectionView.TaskFlows);
+        SetSelected(RoutesListSwitcherButton, _routesSectionView == RoutesSectionView.Routes);
+        SetSelected(TaskFlowsListSwitcherButton, _routesSectionView == RoutesSectionView.TaskFlows);
+        SetSelected(RoutesByStatusButton, !_groupRoutesByProject);
+        SetSelected(RoutesByProjectButton, _groupRoutesByProject);
+        SetSelected(TasksCalendarButton, _tasksView == TasksView.Calendar);
+        SetSelected(TasksListButton, _tasksView == TasksView.List);
+        RenderReviewTimeline();
+        RenderTaskBoard();
+        RenderTaskFlows();
         SetSelected(InboxAllButton, _inboxFilter == InboxFilter.All);
         SetSelected(InboxUnorganizedButton, _inboxFilter == InboxFilter.Unorganized);
         SetSelected(InboxOrganizedButton, _inboxFilter == InboxFilter.Organized);
@@ -151,7 +169,9 @@ public sealed partial class MainWindow : Window
         var matchingRouteIds = RouteListPresentation.Search(_session.State, _routeSearchText)
             .Select(route => route.Id)
             .ToHashSet();
-        var sections = RouteListPresentation.GroupByStatus(_session.State)
+        var sections = (_groupRoutesByProject
+                ? RouteListPresentation.GroupByProject(_session.State)
+                : RouteListPresentation.GroupByStatus(_session.State))
             .Select(section => new RouteListSection(
                 section.Title,
                 section.Routes.Where(route => matchingRouteIds.Contains(route.Id)).ToArray()))
@@ -190,32 +210,36 @@ public sealed partial class MainWindow : Window
                     });
                 }
 
-                var controls = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
-                var select = new Button { Content = T("查看路线", "View route"), Tag = route.Id.ToString() };
-                select.Click += OpenRouteDetailButton_Click;
-                controls.Children.Add(select);
-                if (route.Lifecycle is RouteLifecycle.Draft or RouteLifecycle.Paused && route.CurrentStep() is not null)
-                {
-                    var activate = new Button { Content = T("设为当前路线", "Make current"), Tag = route.Id.ToString() };
-                    activate.Click += ActivateRouteButton_Click;
-                    controls.Children.Add(activate);
-                }
-
+                var primary = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6 };
+                primary.Children.Add(RowAction(T("查看", "View"), route.Id, OpenRouteDetailButton_Click));
                 if (route.Lifecycle != RouteLifecycle.Archived)
                 {
-                    var edit = new Button { Content = T("编辑路线", "Edit route"), Tag = route.Id.ToString() };
-                    edit.Click += EditRouteButton_Click;
-                    controls.Children.Add(edit);
+                    primary.Children.Add(RowAction(T("编辑", "Edit"), route.Id, EditRouteButton_Click));
+                }
+
+                line.Children.Add(primary);
+
+                var secondary = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6 };
+                if (route.Lifecycle is RouteLifecycle.Draft or RouteLifecycle.Paused && route.CurrentStep() is not null)
+                {
+                    secondary.Children.Add(RowAction(T("设为当前", "Make current"), route.Id, ActivateRouteButton_Click));
+                }
+
+                if (route.Lifecycle != RouteLifecycle.Archived && route.Steps.Count > 0)
+                {
+                    secondary.Children.Add(RowAction(T("存为任务流", "Save as task flow"), route.Id, SaveTaskFlowFromRouteButton_Click));
                 }
 
                 if (route.Id != _session.State.Execution.ActiveRouteId && route.Lifecycle != RouteLifecycle.Archived)
                 {
-                    var archive = new Button { Content = T("归档路线", "Archive route"), Tag = route.Id.ToString() };
-                    archive.Click += ArchiveRouteButton_Click;
-                    controls.Children.Add(archive);
+                    secondary.Children.Add(RowAction(T("归档", "Archive"), route.Id, ArchiveRouteButton_Click));
                 }
 
-                line.Children.Add(controls);
+                if (secondary.Children.Count > 0)
+                {
+                    line.Children.Add(secondary);
+                }
+
                 if (item.IsPaused)
                 {
                     var disclosure = new Button
@@ -306,12 +330,265 @@ public sealed partial class MainWindow : Window
         UpdatePlanningLayout(PlanningPanel.ActualWidth);
     }
 
+    private void RoutesViewButton_Click(object sender, RoutedEventArgs e)
+    {
+        _routesSectionView = RoutesSectionView.Routes;
+        RenderPlanning();
+    }
+
+    private void TaskFlowsViewButton_Click(object sender, RoutedEventArgs e)
+    {
+        _routesSectionView = RoutesSectionView.TaskFlows;
+        RenderPlanning();
+    }
+
+    private async void StartTaskFlowButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (!TryReadTag(sender, out var taskFlowId))
+        {
+            return;
+        }
+
+        await RunAsync(
+            () => _session.StartTaskFlowAsync(taskFlowId),
+            "任务流已开始。",
+            () => _planningMode = false);
+    }
+
+    private async void SaveTaskFlowFromRouteButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (!TryReadTag(sender, out var routeId))
+        {
+            return;
+        }
+
+        var title = _session.State.Route(routeId).Title;
+        await RunAsync(
+            () => _session.CreateTaskFlowFromRouteAsync(routeId, title),
+            "已存为任务流。");
+    }
+
+    private void RenderTaskFlows()
+    {
+        TaskFlowsPanel.Children.Clear();
+        var flows = TaskFlowPresentation.Flows(_session.State);
+        if (flows.Count == 0)
+        {
+            TaskFlowsPanel.Children.Add(new TextBlock
+            {
+                Text = T(
+                    "还没有任务流。可以在「路线」里把一条路线存为任务流。",
+                    "No task flows yet. Save a route as a task flow from Routes."),
+                Opacity = 0.68,
+                TextWrapping = TextWrapping.Wrap
+            });
+            return;
+        }
+
+        foreach (var summary in flows)
+        {
+            var line = new StackPanel { Spacing = 6 };
+            line.Children.Add(new TextBlock
+            {
+                Text = summary.Flow.Title,
+                Style = (Style)Application.Current.Resources["BodyStrongTextBlockStyle"],
+                TextWrapping = TextWrapping.Wrap
+            });
+            line.Children.Add(new TextBlock
+            {
+                Text = $"{summary.StepCount} {T("步", "steps")}",
+                Opacity = 0.72
+            });
+
+            var controls = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
+            var start = new Button
+            {
+                Content = summary.HasUnfinishedInstance
+                    ? T("继续本次", "Continue this run")
+                    : T("开始整组", "Start the group"),
+                Tag = summary.Flow.Id.ToString()
+            };
+            start.Click += StartTaskFlowButton_Click;
+            controls.Children.Add(start);
+            line.Children.Add(controls);
+
+            TaskFlowsPanel.Children.Add(new Border
+            {
+                Background = new SolidColorBrush(Colors.White),
+                BorderBrush = new SolidColorBrush(Colors.LightGray),
+                BorderThickness = new Thickness(1),
+                CornerRadius = new CornerRadius(8),
+                Padding = new Thickness(12),
+                Child = line
+            });
+        }
+    }
+
+    private void TaskSearchInput_TextChanged(object sender, TextChangedEventArgs e)
+    {
+        _taskSearchText = TaskSearchInput.Text;
+        if (_planningMode && _planningDestination == PlanningDestination.Tasks)
+        {
+            RenderPlanning();
+        }
+    }
+
+    private void TasksViewButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button { Tag: string view } ||
+            !Enum.TryParse<TasksView>(view, out var parsed))
+        {
+            return;
+        }
+
+        _tasksView = parsed;
+        RenderPlanning();
+    }
+
+    private void RenderTaskBoard()
+    {
+        var state = _session.State;
+        TaskBoardPanel.Children.Clear();
+        var tasks = TaskBoardPresentation.Tasks(state, _taskSearchText);
+        if (tasks.Count == 0)
+        {
+            TaskBoardPanel.Children.Add(new TextBlock
+            {
+                Text = string.IsNullOrWhiteSpace(_taskSearchText)
+                    ? T("还没有任务。先在「路线」里准备步骤。", "No tasks yet. Prepare steps inside Routes first.")
+                    : T("没有匹配的任务。", "No matching tasks."),
+                Opacity = 0.68
+            });
+            return;
+        }
+
+        if (_tasksView == TasksView.List)
+        {
+            foreach (var task in tasks)
+            {
+                TaskBoardPanel.Children.Add(BuildTaskRow(task));
+            }
+
+            return;
+        }
+
+        foreach (var bucket in TaskBoardPresentation.CalendarBuckets(state, _taskSearchText))
+        {
+            TaskBoardPanel.Children.Add(new TextBlock
+            {
+                Text = bucket.Date is DateOnly date ? date.ToString("D") : T("无日期", "Unscheduled"),
+                Style = (Style)Application.Current.Resources["BodyStrongTextBlockStyle"],
+                Margin = new Thickness(0, 6, 0, 0)
+            });
+            foreach (var task in bucket.Tasks)
+            {
+                TaskBoardPanel.Children.Add(BuildTaskRow(task));
+            }
+        }
+    }
+
+    private Border BuildTaskRow(TaskProjection task)
+    {
+        var line = new StackPanel { Spacing = 4 };
+        line.Children.Add(new TextBlock
+        {
+            Text = task.Action,
+            Style = (Style)Application.Current.Resources["BodyStrongTextBlockStyle"],
+            TextWrapping = TextWrapping.Wrap
+        });
+        line.Children.Add(new TextBlock
+        {
+            Text = $"{task.RouteTitle} · {LifecycleText(task.RouteLifecycle)}",
+            Opacity = 0.72
+        });
+        if (!task.IsReady)
+        {
+            line.Children.Add(new TextBlock
+            {
+                Text = T("尚未准备好（缺少完成标准）", "Not ready yet (no completion standard)"),
+                Foreground = new SolidColorBrush(Colors.DarkOrange)
+            });
+        }
+
+        return new Border
+        {
+            Background = new SolidColorBrush(Colors.White),
+            BorderBrush = new SolidColorBrush(Colors.LightGray),
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(8),
+            Padding = new Thickness(12),
+            Child = line
+        };
+    }
+
+    private DateOnly? ReadStepDate() =>
+        StepDatePicker.Date is DateTimeOffset value ? DateOnly.FromDateTime(value.Date) : null;
+
+    private void SetStepDate(DateOnly? value) =>
+        StepDatePicker.Date = value is null
+            ? null
+            : new DateTimeOffset(value.Value.ToDateTime(TimeOnly.MinValue), TimeSpan.Zero);
+
+    private static Button RowAction(string text, Guid routeId, RoutedEventHandler handler)
+    {
+        var button = new Button
+        {
+            Content = text,
+            Tag = routeId.ToString(),
+            Padding = new Thickness(10, 4, 10, 4),
+            FontSize = 13
+        };
+        button.Click += handler;
+        return button;
+    }
+
+    private void RenderReviewTimeline()
+    {
+        ReviewTimelinePanel.Children.Clear();
+        var entries = ReviewPresentation.Timeline(_session.State);
+        if (entries.Count == 0)
+        {
+            ReviewTimelinePanel.Children.Add(new TextBlock
+            {
+                Text = T("还没有可用的历史记录。", "No recorded history yet."),
+                Opacity = 0.68
+            });
+            return;
+        }
+
+        foreach (var entry in entries)
+        {
+            var line = new StackPanel { Spacing = 4 };
+            line.Children.Add(new TextBlock
+            {
+                Text = $"{UiText.HistoryKindLabel(_session.State.LanguagePreference, entry.Kind)}：{entry.Summary}",
+                Style = (Style)Application.Current.Resources["BodyStrongTextBlockStyle"],
+                TextWrapping = TextWrapping.Wrap
+            });
+            line.Children.Add(new TextBlock
+            {
+                Text = entry.OccurredAt.LocalDateTime.ToString("g"),
+                Opacity = 0.62
+            });
+            ReviewTimelinePanel.Children.Add(new Border
+            {
+                Background = new SolidColorBrush(Colors.White),
+                BorderBrush = new SolidColorBrush(Colors.LightGray),
+                BorderThickness = new Thickness(1),
+                CornerRadius = new CornerRadius(8),
+                Padding = new Thickness(12),
+                Child = line
+            });
+        }
+    }
+
     private static string SectionText(string title) => title switch
     {
         "Current" => "当前路线",
         "Paused" => "已暂停",
         "Draft" => "草稿",
         "Completed" => "已完成",
+        RouteListPresentation.UnassignedSectionTitle => "未分配",
         _ => title
     };
 
@@ -350,8 +627,13 @@ public sealed partial class MainWindow : Window
 
     private void RoutesByStatusButton_Click(object sender, RoutedEventArgs e)
     {
-        SetSelected(RoutesByStatusButton, true);
-        SetSelected(RoutesByProjectButton, false);
+        _groupRoutesByProject = false;
+        RenderPlanning();
+    }
+
+    private void RoutesByProjectButton_Click(object sender, RoutedEventArgs e)
+    {
+        _groupRoutesByProject = true;
         RenderPlanning();
     }
 
@@ -600,7 +882,25 @@ public sealed partial class MainWindow : Window
         _settingsOpen = false;
         _planningMode = true;
         _enteringBlock = false;
+        ApplyOrdinaryPlanningEntry();
         Render();
+    }
+
+    private void ApplyOrdinaryPlanningEntry()
+    {
+        if (_planningDestinationChosen)
+        {
+            return;
+        }
+
+        _planningDestination = _session.State.Execution.ActiveRouteId is null
+            ? PlanningDestination.Routes
+            : PlanningDestination.Tasks;
+        _responsivePlanning = _responsivePlanning with
+        {
+            Destination = _planningDestination,
+            Detail = PlanningDetail.None
+        };
     }
 
     private void GuideButton_Click(object sender, RoutedEventArgs e)
@@ -663,52 +963,37 @@ public sealed partial class MainWindow : Window
                 PauseNoteInput.Text = string.Empty;
                 _planningMode = true;
                 _planningDestination = PlanningDestination.Routes;
+                _planningDestinationChosen = true;
             });
     }
 
-    private void RoutesNavButton_Click(object sender, RoutedEventArgs e)
+    private void TasksNavButton_Click(object sender, RoutedEventArgs e) =>
+        NavigatePlanning(PlanningDestination.Tasks);
+
+    private void RoutesNavButton_Click(object sender, RoutedEventArgs e) =>
+        NavigatePlanning(PlanningDestination.Routes);
+
+    private void InboxNavButton_Click(object sender, RoutedEventArgs e) =>
+        NavigatePlanning(PlanningDestination.Inbox);
+
+    private void ReviewNavButton_Click(object sender, RoutedEventArgs e) =>
+        NavigatePlanning(PlanningDestination.Review);
+
+    private void ArchiveNavButton_Click(object sender, RoutedEventArgs e) =>
+        NavigatePlanning(PlanningDestination.Archive);
+
+    private void NavigatePlanning(PlanningDestination destination)
     {
         if (!_captureContext.CanChangeUnderlyingContext)
         {
             return;
         }
 
-        _planningDestination = PlanningDestination.Routes;
+        _planningDestination = destination;
+        _planningDestinationChosen = true;
         _responsivePlanning = _responsivePlanning with
         {
-            Destination = PlanningDestination.Routes,
-            Detail = PlanningDetail.None
-        };
-        Render();
-    }
-
-    private void InboxNavButton_Click(object sender, RoutedEventArgs e)
-    {
-        if (!_captureContext.CanChangeUnderlyingContext)
-        {
-            return;
-        }
-
-        _planningDestination = PlanningDestination.Inbox;
-        _responsivePlanning = _responsivePlanning with
-        {
-            Destination = PlanningDestination.Inbox,
-            Detail = PlanningDetail.None
-        };
-        Render();
-    }
-
-    private void ArchiveNavButton_Click(object sender, RoutedEventArgs e)
-    {
-        if (!_captureContext.CanChangeUnderlyingContext)
-        {
-            return;
-        }
-
-        _planningDestination = PlanningDestination.Archive;
-        _responsivePlanning = _responsivePlanning with
-        {
-            Destination = PlanningDestination.Archive,
+            Destination = destination,
             Detail = PlanningDetail.None
         };
         Render();
@@ -771,14 +1056,15 @@ public sealed partial class MainWindow : Window
         }
 
         var route = Route.Create(title, _draftSteps.ToArray());
+        var projectName = ProjectNameInput.Text;
         var savingUpdate = _editingRouteId;
         var convertingCapture = _convertingCaptureId;
         await RunAsync(
             () => savingUpdate is Guid routeId
-                ? _session.UpdateRouteAsync(routeId, title, _draftSteps)
+                ? _session.UpdateRouteAsync(routeId, title, _draftSteps, projectName)
                 : convertingCapture is Guid captureId
-                    ? _session.ConvertCaptureToRouteAsync(captureId, route)
-                    : _session.AddRouteAsync(route),
+                    ? _session.ConvertCaptureToRouteAsync(captureId, route, projectName)
+                    : _session.AddRouteAsync(route, projectName),
             savingUpdate is not null ? "路线已更新。" : convertingCapture is not null ? "想法已转换为草稿路线。" : "草稿路线已保存。",
             ClearRouteEditor);
     }
@@ -796,7 +1082,16 @@ public sealed partial class MainWindow : Window
         }
 
         var id = _editingStepId ?? Guid.NewGuid();
-        var step = new Step(id, _draftSteps.Count, action, completionStandard, doNotDo, fallback, _editingStepWasCompleted);
+        var step = new Step(
+            id,
+            _draftSteps.Count,
+            action,
+            completionStandard,
+            doNotDo,
+            fallback,
+            _editingStepWasCompleted,
+            ReadStepDate(),
+            _editingStepPlannedTime);
         if (_editingStepIndex is int index)
         {
             _draftSteps.Insert(index, step);
@@ -861,6 +1156,8 @@ public sealed partial class MainWindow : Window
         CompletionStandardInput.Text = step.CompletionStandard;
         DoNotDoInput.Text = step.DoNotDo;
         FallbackActionInput.Text = step.FallbackAction ?? string.Empty;
+        SetStepDate(step.PlannedDate);
+        _editingStepPlannedTime = step.PlannedTime;
         RenderPlanning();
     }
 
@@ -907,6 +1204,7 @@ public sealed partial class MainWindow : Window
         _editingRouteId = routeId;
         _convertingCaptureId = null;
         RouteTitleInput.Text = route.Title;
+        ProjectNameInput.Text = RouteListPresentation.ProjectName(_session.State, route) ?? string.Empty;
         _draftSteps.Clear();
         _draftSteps.AddRange(route.Steps);
         ClearStepEditor();
@@ -932,6 +1230,7 @@ public sealed partial class MainWindow : Window
         _editingRouteId = null;
         _convertingCaptureId = captureId;
         RouteTitleInput.Text = capture.RawText.Length > 60 ? capture.RawText[..60] : capture.RawText;
+        ProjectNameInput.Text = string.Empty;
         _draftSteps.Clear();
         RouteActionInput.Text = capture.RawText;
         CompletionStandardInput.Text = string.Empty;
@@ -956,6 +1255,7 @@ public sealed partial class MainWindow : Window
         _convertingCaptureId = null;
         _draftSteps.Clear();
         RouteTitleInput.Text = string.Empty;
+        ProjectNameInput.Text = string.Empty;
         ClearStepEditor();
         SaveRouteButton.Content = "保存草稿路线";
     }
@@ -965,10 +1265,12 @@ public sealed partial class MainWindow : Window
         _editingStepId = null;
         _editingStepIndex = null;
         _editingStepWasCompleted = false;
+        _editingStepPlannedTime = null;
         RouteActionInput.Text = string.Empty;
         CompletionStandardInput.Text = string.Empty;
         DoNotDoInput.Text = string.Empty;
         FallbackActionInput.Text = string.Empty;
+        SetStepDate(null);
     }
 
     private static bool TryReadTag(object sender, out Guid id)
@@ -1052,14 +1354,40 @@ public sealed partial class MainWindow : Window
         ToolTipService.SetToolTip(SettingsButton, T("设置", "Settings"));
         PlanningTitleText.Text = T("规划", "Planning");
         PlanningSubtitleText.Text = T("管理", "Manage");
+        TasksNavButton.Content = T("任务", "Tasks");
         RoutesNavButton.Content = T("路线", "Routes");
+        RoutesListViewButton.Content = T("路线", "Routes");
+        TaskFlowsListViewButton.Content = T("任务流", "Task flows");
+        RoutesListSwitcherButton.Content = T("路线", "Routes");
+        TaskFlowsListSwitcherButton.Content = T("任务流", "Task flows");
+        TaskFlowsTitleText.Text = T("任务流", "Task flows");
+        TaskFlowsDescriptionText.Text = T(
+            "可复用的一组步骤；开始整组后生成一条路线。",
+            "A reusable set of steps; starting the group creates one route.");
         InboxNavButton.Content = T("收件箱", "Inbox");
+        ReviewNavButton.Content = T("回顾", "Review");
         ArchiveNavButton.Content = T("归档", "Archive");
+        CompactTasksNavButton.Content = T("任务", "Tasks");
+        CompactRoutesNavButton.Content = T("路线", "Routes");
+        CompactInboxNavButton.Content = T("收件箱", "Inbox");
+        CompactReviewNavButton.Content = T("回顾", "Review");
+        CompactArchiveNavButton.Content = T("归档", "Archive");
+        TasksTitleText.Text = T("任务", "Tasks");
+        TaskSearchInput.PlaceholderText = T("搜索任务或路线", "Search tasks or routes");
+        TasksCalendarButton.Content = T("日历", "Calendar");
+        TasksListButton.Content = T("任务列表", "Task list");
+        StepDatePicker.PlaceholderText = T("计划日期（可选，属于当前步骤）", "Planned date (optional, for this step)");
+        ReviewTitleText.Text = T("回顾", "Review");
+        ReviewDescriptionText.Text = T("回顾：只读的历史时间线，按时间倒序。", "Review: a read-only timeline of recorded facts, newest first.");
+        ArchiveTitleText.Text = T("归档", "Archive");
+        ArchiveDescriptionText.Text = T("归档内容会保留，并可在规划中恢复。", "Archived items are retained and can be restored while planning.");
+        ArchivePlaceholderText.Text = T("当前版本会在路线和收件箱条目中显示归档状态。", "This build marks archive state on routes and inbox entries.");
         RoutesTitleText.Text = T("路线", "Routes");
-        RouteSearchInput.PlaceholderText = T("搜索路线标题或下一动作", "Search route title or next action");
+        RouteSearchInput.PlaceholderText = T("搜索标题、动作或项目", "Search title, action, or project");
         RoutesByStatusButton.Content = T("按状态", "By status");
         RoutesByProjectButton.Content = T("按项目", "By project");
-        ToolTipService.SetToolTip(RoutesByProjectButton, T("领域模型尚未提供项目归属", "Project ownership is not in the domain model yet"));
+        ToolTipService.SetToolTip(RoutesByProjectButton, T("按项目分组", "Group routes by project"));
+        ProjectNameInput.PlaceholderText = T("项目（可选）", "Project (optional)");
         InboxTitleText.Text = T("收件箱", "Inbox");
         InboxSearchInput.PlaceholderText = T("搜索原文或整理内容", "Search raw or organized text");
         InboxAllButton.Content = T("全部", "All");
@@ -1128,13 +1456,11 @@ public sealed partial class MainWindow : Window
 
         PlanningNavigationColumn.Width = new GridLength(compact ? 0 : 196);
         PlanningNavigationSurface.Visibility = ToVisibility(!compact);
-        CompactRoutesNavigation.Visibility = ToVisibility(compact);
-        CompactInboxNavigation.Visibility = ToVisibility(compact);
-        CompactArchiveNavigation.Visibility = ToVisibility(compact);
+        CompactPlanningNavigation.Visibility = ToVisibility(compact);
 
         RouteListColumn.Width = compact
             ? routeDetail ? new GridLength(0) : new GridLength(1, GridUnitType.Star)
-            : new GridLength(280);
+            : new GridLength(340);
         RouteEditorColumn.Width = compact
             ? routeDetail ? new GridLength(1, GridUnitType.Star) : new GridLength(0)
             : new GridLength(1, GridUnitType.Star);
@@ -1165,6 +1491,10 @@ public sealed partial class MainWindow : Window
         InboxBackButton.Visibility = ToVisibility(compact && inboxDetail);
         RoutesWorkspace.Padding = compact ? new Thickness(16, 12, 16, 16) : new Thickness(24, 20, 24, 20);
         InboxWorkspace.Padding = compact ? new Thickness(16, 12, 16, 16) : new Thickness(24, 20, 24, 20);
+        TasksWorkspace.Padding = compact ? new Thickness(16, 12, 16, 16) : new Thickness(32, 24, 32, 24);
+        TaskFlowsWorkspace.Padding = compact ? new Thickness(16, 12, 16, 16) : new Thickness(24, 20, 24, 20);
+        ReviewWorkspace.Padding = compact ? new Thickness(16, 12, 16, 16) : new Thickness(32, 24, 32, 24);
+        ArchiveWorkspace.Padding = compact ? new Thickness(16, 12, 16, 16) : new Thickness(32, 24, 32, 24);
     }
 
     private void RestorePlanningListContext()
@@ -1231,6 +1561,20 @@ public sealed partial class MainWindow : Window
         RouteLifecycle.Archived => "已归档",
         _ => lifecycle.ToString()
     };
+
+    private void SyncNavigationSelection()
+    {
+        SetSelected(TasksNavButton, _planningDestination == PlanningDestination.Tasks);
+        SetSelected(RoutesNavButton, _planningDestination == PlanningDestination.Routes);
+        SetSelected(InboxNavButton, _planningDestination == PlanningDestination.Inbox);
+        SetSelected(ReviewNavButton, _planningDestination == PlanningDestination.Review);
+        SetSelected(ArchiveNavButton, _planningDestination == PlanningDestination.Archive);
+        SetSelected(CompactTasksNavButton, _planningDestination == PlanningDestination.Tasks);
+        SetSelected(CompactRoutesNavButton, _planningDestination == PlanningDestination.Routes);
+        SetSelected(CompactInboxNavButton, _planningDestination == PlanningDestination.Inbox);
+        SetSelected(CompactReviewNavButton, _planningDestination == PlanningDestination.Review);
+        SetSelected(CompactArchiveNavButton, _planningDestination == PlanningDestination.Archive);
+    }
 
     private void SetSelected(Button button, bool selected)
     {

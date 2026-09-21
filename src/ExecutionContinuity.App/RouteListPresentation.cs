@@ -19,6 +19,8 @@ public sealed record RouteListItem(
 
 public static class RouteListPresentation
 {
+    public const string UnassignedSectionTitle = "Unassigned";
+
     public static IReadOnlyList<Route> Search(AppState state, string? query)
     {
         var normalized = query?.Trim();
@@ -32,7 +34,9 @@ public static class RouteListPresentation
             .Where(route =>
             {
                 var item = Describe(state, route);
-                return Contains(route.Title, normalized) || Contains(item.NextAction, normalized);
+                return Contains(route.Title, normalized) ||
+                    Contains(item.NextAction, normalized) ||
+                    Contains(ProjectName(state, route) ?? string.Empty, normalized);
             })
             .OrderBy(route => route.Title)
             .ToArray();
@@ -55,6 +59,40 @@ public static class RouteListPresentation
             .Where(section => section.Routes.Count > 0)
             .ToArray();
     }
+
+    public static IReadOnlyList<RouteListSection> GroupByProject(AppState state)
+    {
+        var sections = new List<RouteListSection>();
+        foreach (var project in state.Projects
+            .OrderBy(project => project.Name, StringComparer.CurrentCultureIgnoreCase)
+            .ThenBy(project => project.Id))
+        {
+            var routes = OrderByLifecycle(
+                state,
+                state.Routes.Where(route =>
+                    route.Lifecycle != RouteLifecycle.Archived && route.ProjectId == project.Id));
+            if (routes.Count > 0)
+            {
+                sections.Add(new RouteListSection(project.Name, routes));
+            }
+        }
+
+        var unassigned = OrderByLifecycle(
+            state,
+            state.Routes.Where(route =>
+                route.Lifecycle != RouteLifecycle.Archived && route.ProjectId is null));
+        if (unassigned.Count > 0)
+        {
+            sections.Add(new RouteListSection(UnassignedSectionTitle, unassigned));
+        }
+
+        return sections;
+    }
+
+    public static string? ProjectName(AppState state, Route route) =>
+        route.ProjectId is Guid projectId
+            ? state.Projects.FirstOrDefault(project => project.Id == projectId)?.Name
+            : null;
 
     public static RouteListItem Describe(AppState state, Route route)
     {
@@ -83,6 +121,24 @@ public static class RouteListPresentation
                 .ThenBy(route => route.Title)
             : routes.OrderBy(route => route.Title);
     }
+
+    private static IReadOnlyList<Route> OrderByLifecycle(AppState state, IEnumerable<Route> routes) =>
+        routes
+            .OrderBy(route => LifecycleOrder(route.Lifecycle))
+            .ThenByDescending(route => route.Lifecycle == RouteLifecycle.Paused
+                ? state.NewestValidSnapshotFor(route.Id)?.PausedAt ?? DateTimeOffset.MinValue
+                : DateTimeOffset.MinValue)
+            .ThenBy(route => route.Title)
+            .ToArray();
+
+    private static int LifecycleOrder(RouteLifecycle lifecycle) => lifecycle switch
+    {
+        RouteLifecycle.Active => 0,
+        RouteLifecycle.Paused => 1,
+        RouteLifecycle.Draft => 2,
+        RouteLifecycle.Completed => 3,
+        _ => 4
+    };
 
     private static bool Contains(string value, string query) =>
         value.Contains(query, StringComparison.OrdinalIgnoreCase);

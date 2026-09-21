@@ -4,8 +4,10 @@ namespace ExecutionContinuity.App;
 
 public enum PlanningDestination
 {
+    Tasks,
     Routes,
     Inbox,
+    Review,
     Archive
 }
 

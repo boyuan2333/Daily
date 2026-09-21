@@ -127,18 +127,72 @@
                             <ColumnDefinition x:Name="PlanningNavigationColumn" Width="196" />
                             <ColumnDefinition Width="*" />
                         </Grid.ColumnDefinitions>
-                        <Border x:Name="PlanningNavigationSurface" Background="#F3F4EF" BorderBrush="#E1E6E0" BorderThickness="0,0,1,0" Padding="16">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
+                        <StackPanel x:Name="CompactPlanningNavigation" Grid.Row="0" Grid.ColumnSpan="2" Orientation="Horizontal" Spacing="8" Padding="16,12,16,0" Visibility="Collapsed">
+                            <Button x:Name="CompactTasksNavButton" Content="任务" Click="TasksNavButton_Click" Background="Transparent" BorderBrush="Transparent" Padding="12,8" MinHeight="36" />
+                            <Button x:Name="CompactRoutesNavButton" Content="路线" Click="RoutesNavButton_Click" Background="#4A845E" Foreground="White" BorderBrush="#4A845E" Padding="12,8" MinHeight="36" />
+                            <Button x:Name="CompactInboxNavButton" Content="收件箱" Click="InboxNavButton_Click" Background="Transparent" BorderBrush="Transparent" Padding="12,8" MinHeight="36" />
+                            <Button x:Name="CompactReviewNavButton" Content="回顾" Click="ReviewNavButton_Click" Background="Transparent" BorderBrush="Transparent" Padding="12,8" MinHeight="36" />
+                            <Button x:Name="CompactArchiveNavButton" Content="归档" Click="ArchiveNavButton_Click" Background="Transparent" BorderBrush="Transparent" Padding="12,8" MinHeight="36" />
+                        </StackPanel>
+                        <Border x:Name="PlanningNavigationSurface" Grid.Row="1" Grid.Column="0" Background="#F3F4EF" BorderBrush="#E1E6E0" BorderThickness="0,0,1,0" Padding="16">
                             <StackPanel Spacing="8">
                                 <TextBlock x:Name="PlanningTitleText" Text="规划" FontSize="22" FontWeight="SemiBold" Margin="0,12,0,0" />
                                 <TextBlock x:Name="PlanningSubtitleText" Text="管理" Foreground="#66706A" Margin="0,0,0,18" />
+                                <Button x:Name="TasksNavButton" Content="任务" Click="TasksNavButton_Click" Background="Transparent" BorderBrush="Transparent" Padding="12,8" MinHeight="36" HorizontalAlignment="Stretch" />
                                 <Button x:Name="RoutesNavButton" Content="路线" Click="RoutesNavButton_Click" Background="#4A845E" Foreground="White" BorderBrush="#4A845E" Padding="12,8" MinHeight="36" HorizontalAlignment="Stretch" />
                                 <Button x:Name="InboxNavButton" Content="收件箱" Click="InboxNavButton_Click" Background="Transparent" BorderBrush="Transparent" Padding="12,8" MinHeight="36" HorizontalAlignment="Stretch" />
+                                <Button x:Name="ReviewNavButton" Content="回顾" Click="ReviewNavButton_Click" Background="Transparent" BorderBrush="Transparent" Padding="12,8" MinHeight="36" HorizontalAlignment="Stretch" />
+                                <Border Height="1" Background="#E1E6E0" Margin="0,8,0,8" />
                                 <Button x:Name="ArchiveNavButton" Content="归档" Click="ArchiveNavButton_Click" Background="Transparent" BorderBrush="Transparent" Padding="12,8" MinHeight="36" HorizontalAlignment="Stretch" />
                             </StackPanel>
                         </Border>
-                        <Grid Grid.Column="1" x:Name="RoutesWorkspace" Padding="24,20" ColumnSpacing="24" RowSpacing="20">
+                        <Grid Grid.Row="1" Grid.Column="1" x:Name="TasksWorkspace" Padding="24,20" VerticalAlignment="Stretch">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="*" />
+                            </Grid.RowDefinitions>
+                            <Grid ColumnSpacing="12">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Spacing="8">
+                                    <TextBlock x:Name="TasksTitleText" Text="任务" FontSize="24" FontWeight="SemiBold" />
+                                    <TextBox x:Name="TaskSearchInput" PlaceholderText="搜索任务或路线" TextChanged="TaskSearchInput_TextChanged" MinHeight="36" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Bottom">
+                                    <Button x:Name="TasksCalendarButton" Content="日历" Click="TasksViewButton_Click" Tag="Calendar" Padding="10,6" MinHeight="34" />
+                                    <Button x:Name="TasksListButton" Content="任务列表" Click="TasksViewButton_Click" Tag="List" Padding="10,6" MinHeight="34" />
+                                </StackPanel>
+                            </Grid>
+                            <Border Grid.Row="1" Background="#FFFFFF" BorderBrush="#E1E6E0" BorderThickness="1" CornerRadius="12" Padding="16" Margin="0,16,0,0">
+                                <ScrollViewer x:Name="TaskBoardScrollViewer" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                                    <StackPanel x:Name="TaskBoardPanel" Spacing="12" />
+                                </ScrollViewer>
+                            </Border>
+                        </Grid>
+                        <Grid Grid.Row="1" Grid.Column="1" x:Name="ReviewWorkspace" Padding="32,24" VerticalAlignment="Stretch">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="*" />
+                            </Grid.RowDefinitions>
+                            <StackPanel Spacing="8" Margin="0,18,0,0">
+                                <TextBlock x:Name="ReviewTitleText" Text="回顾" FontSize="24" FontWeight="SemiBold" />
+                                <TextBlock x:Name="ReviewDescriptionText" Text="回顾：只读的历史时间线。" Foreground="#66706A" />
+                            </StackPanel>
+                            <Border Grid.Row="1" Background="#FFFFFF" BorderBrush="#E1E6E0" BorderThickness="1" CornerRadius="12" Padding="16" Margin="0,16,0,0">
+                                <ScrollViewer x:Name="ReviewTimelineScrollViewer" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                                    <StackPanel x:Name="ReviewTimelinePanel" Spacing="10" />
+                                </ScrollViewer>
+                            </Border>
+                        </Grid>
+                        <Grid Grid.Row="1" Grid.Column="1" x:Name="RoutesWorkspace" Padding="24,20" ColumnSpacing="24" RowSpacing="20">
                             <Grid.ColumnDefinitions>
-                                <ColumnDefinition x:Name="RouteListColumn" Width="280" />
+                                <ColumnDefinition x:Name="RouteListColumn" Width="340" />
                                 <ColumnDefinition x:Name="RouteEditorColumn" Width="*" />
                             </Grid.ColumnDefinitions>
                             <Grid.RowDefinitions>
@@ -146,10 +200,9 @@
                                 <RowDefinition x:Name="RouteListRow" Height="*" />
                                 <RowDefinition x:Name="RouteEditorRow" Height="0" />
                             </Grid.RowDefinitions>
-                            <StackPanel x:Name="CompactRoutesNavigation" Grid.Row="0" Grid.ColumnSpan="2" Orientation="Horizontal" Spacing="8" Visibility="Collapsed">
-                                <Button Content="路线" Click="RoutesNavButton_Click" Background="#4A845E" Foreground="White" BorderBrush="#4A845E" Padding="12,8" MinHeight="36" />
-                                <Button Content="收件箱" Click="InboxNavButton_Click" Background="Transparent" BorderBrush="Transparent" Padding="12,8" MinHeight="36" />
-                                <Button Content="归档" Click="ArchiveNavButton_Click" Background="Transparent" BorderBrush="Transparent" Padding="12,8" MinHeight="36" />
+                            <StackPanel Grid.Row="0" Grid.ColumnSpan="2" Orientation="Horizontal" Spacing="6">
+                                <Button x:Name="RoutesListViewButton" Content="路线" Click="RoutesViewButton_Click" Padding="10,6" MinHeight="34" />
+                                <Button x:Name="TaskFlowsListViewButton" Content="任务流" Click="TaskFlowsViewButton_Click" Padding="10,6" MinHeight="34" />
                             </StackPanel>
                             <Border x:Name="RouteListSurface" Grid.Row="1" Background="#FFFFFF" BorderBrush="#E1E6E0" BorderThickness="1" CornerRadius="12" Padding="16">
                                 <Grid RowSpacing="16">
@@ -157,20 +210,14 @@
                                         <RowDefinition Height="Auto" />
                                         <RowDefinition Height="*" />
                                     </Grid.RowDefinitions>
-                                    <Grid ColumnSpacing="12">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*" />
-                                            <ColumnDefinition Width="Auto" />
-                                        </Grid.ColumnDefinitions>
-                                        <StackPanel Spacing="8">
-                                            <TextBlock x:Name="RoutesTitleText" Text="路线" FontSize="20" FontWeight="SemiBold" VerticalAlignment="Center" />
-                                            <TextBox x:Name="RouteSearchInput" PlaceholderText="搜索路线标题或下一动作" TextChanged="RouteSearchInput_TextChanged" MinHeight="36" />
-                                        </StackPanel>
-                                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6">
+                                    <StackPanel Spacing="8">
+                                        <TextBlock x:Name="RoutesTitleText" Text="路线" FontSize="20" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                        <TextBox x:Name="RouteSearchInput" PlaceholderText="搜索路线标题或下一动作" TextChanged="RouteSearchInput_TextChanged" MinHeight="36" />
+                                        <StackPanel Orientation="Horizontal" Spacing="6">
                                             <Button x:Name="RoutesByStatusButton" Content="按状态" Click="RoutesByStatusButton_Click" Padding="10,6" MinHeight="34" />
-                                            <Button x:Name="RoutesByProjectButton" Content="按项目" IsEnabled="False" Padding="10,6" MinHeight="34" ToolTipService.ToolTip="领域模型尚未提供项目归属" />
+                                            <Button x:Name="RoutesByProjectButton" Content="按项目" Click="RoutesByProjectButton_Click" Padding="10,6" MinHeight="34" />
                                         </StackPanel>
-                                    </Grid>
+                                    </StackPanel>
                                     <ScrollViewer x:Name="RouteListScrollViewer" Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                                         <StackPanel x:Name="RouteListPanel" Spacing="10" />
                                     </ScrollViewer>
@@ -188,6 +235,9 @@
                                                 <TextBox x:Name="RouteTitleInput" Background="Transparent" BorderThickness="0" Padding="14,10" FontFamily="Microsoft YaHei UI" FontSize="15" PlaceholderText="路线标题" />
                                             </Border>
                                             <Border Background="#FFFFFF" BorderBrush="#B8C4B9" BorderThickness="1" CornerRadius="8" MinHeight="44">
+                                                <TextBox x:Name="ProjectNameInput" Background="Transparent" BorderThickness="0" Padding="14,10" FontFamily="Microsoft YaHei UI" FontSize="15" PlaceholderText="项目（可选）" />
+                                            </Border>
+                                            <Border Background="#FFFFFF" BorderBrush="#B8C4B9" BorderThickness="1" CornerRadius="8" MinHeight="44">
                                                 <TextBox x:Name="RouteActionInput" Background="Transparent" BorderThickness="0" Padding="14,10" FontFamily="Microsoft YaHei UI" FontSize="15" PlaceholderText="第一个可执行动作" AcceptsReturn="True" TextWrapping="Wrap" />
                                             </Border>
                                             <Border Background="#FFFFFF" BorderBrush="#B8C4B9" BorderThickness="1" CornerRadius="8" MinHeight="44">
@@ -199,6 +249,7 @@
                                             <Border Background="#FFFFFF" BorderBrush="#B8C4B9" BorderThickness="1" CornerRadius="8" MinHeight="44">
                                                 <TextBox x:Name="FallbackActionInput" Background="Transparent" BorderThickness="0" Padding="14,10" FontFamily="Microsoft YaHei UI" FontSize="15" PlaceholderText="可选的预设备选动作" AcceptsReturn="True" TextWrapping="Wrap" />
                                             </Border>
+                                            <CalendarDatePicker x:Name="StepDatePicker" PlaceholderText="计划日期（可选，属于当前步骤）" HorizontalAlignment="Stretch" MinHeight="40" />
                                             <StackPanel Orientation="Horizontal" Spacing="10">
                                                 <Button x:Name="AddStepButton" Click="AddStepButton_Click" Style="{StaticResource PlanningSecondaryButtonStyle}">
                                                     <StackPanel Orientation="Horizontal" Spacing="8">
@@ -215,7 +266,32 @@
                                 </StackPanel>
                             </ScrollViewer>
                         </Grid>
-                        <Grid Grid.Column="1" x:Name="InboxWorkspace" Padding="24,20" ColumnSpacing="24" RowSpacing="20">
+                        <Grid Grid.Row="1" Grid.Column="1" x:Name="TaskFlowsWorkspace" Padding="24,20" VerticalAlignment="Stretch">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="*" />
+                            </Grid.RowDefinitions>
+                            <Grid ColumnSpacing="12">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Spacing="8">
+                                    <TextBlock x:Name="TaskFlowsTitleText" Text="任务流" FontSize="24" FontWeight="SemiBold" />
+                                    <TextBlock x:Name="TaskFlowsDescriptionText" Text="可复用的一组步骤；开始整组后生成一条路线。" Foreground="#66706A" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Bottom">
+                                    <Button x:Name="RoutesListSwitcherButton" Content="路线" Click="RoutesViewButton_Click" Padding="10,6" MinHeight="34" />
+                                    <Button x:Name="TaskFlowsListSwitcherButton" Content="任务流" Click="TaskFlowsViewButton_Click" Padding="10,6" MinHeight="34" />
+                                </StackPanel>
+                            </Grid>
+                            <Border Grid.Row="1" Background="#FFFFFF" BorderBrush="#E1E6E0" BorderThickness="1" CornerRadius="12" Padding="16" Margin="0,16,0,0">
+                                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                                    <StackPanel x:Name="TaskFlowsPanel" Spacing="10" />
+                                </ScrollViewer>
+                            </Border>
+                        </Grid>
+                        <Grid Grid.Row="1" Grid.Column="1" x:Name="InboxWorkspace" Padding="24,20" ColumnSpacing="24" RowSpacing="20">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition x:Name="InboxListColumn" Width="300" />
                                 <ColumnDefinition x:Name="InboxDetailColumn" Width="*" />
@@ -225,11 +301,6 @@
                                 <RowDefinition x:Name="InboxListRow" Height="*" />
                                 <RowDefinition x:Name="InboxDetailRow" Height="0" />
                             </Grid.RowDefinitions>
-                            <StackPanel x:Name="CompactInboxNavigation" Grid.Row="0" Grid.ColumnSpan="2" Orientation="Horizontal" Spacing="8" Visibility="Collapsed">
-                                <Button Content="路线" Click="RoutesNavButton_Click" Background="Transparent" BorderBrush="Transparent" Padding="12,8" MinHeight="36" />
-                                <Button Content="收件箱" Click="InboxNavButton_Click" Background="#4A845E" Foreground="White" BorderBrush="#4A845E" Padding="12,8" MinHeight="36" />
-                                <Button Content="归档" Click="ArchiveNavButton_Click" Background="Transparent" BorderBrush="Transparent" Padding="12,8" MinHeight="36" />
-                            </StackPanel>
                             <Border x:Name="InboxListSurface" Grid.Row="1" Background="#FFFFFF" BorderBrush="#E1E6E0" BorderThickness="1" CornerRadius="12" Padding="16">
                                 <Grid RowSpacing="16">
                                     <Grid.RowDefinitions>
@@ -256,20 +327,11 @@
                                 <Button x:Name="InboxBackButton" Content="返回收件箱列表" Click="InboxBackButton_Click" Visibility="Collapsed" HorizontalAlignment="Left" VerticalAlignment="Top" Background="Transparent" BorderBrush="Transparent" Padding="12,8" MinHeight="36" />
                             </Grid>
                         </Grid>
-                        <Grid Grid.Column="1" x:Name="ArchiveWorkspace" Padding="32,24" VerticalAlignment="Top">
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="*" />
-                            </Grid.RowDefinitions>
-                            <StackPanel x:Name="CompactArchiveNavigation" Grid.Row="0" Orientation="Horizontal" Spacing="8" Visibility="Collapsed">
-                                <Button Content="路线" Click="RoutesNavButton_Click" Background="Transparent" BorderBrush="Transparent" Padding="12,8" MinHeight="36" />
-                                <Button Content="收件箱" Click="InboxNavButton_Click" Background="Transparent" BorderBrush="Transparent" Padding="12,8" MinHeight="36" />
-                                <Button Content="归档" Click="ArchiveNavButton_Click" Background="#4A845E" Foreground="White" BorderBrush="#4A845E" Padding="12,8" MinHeight="36" />
-                            </StackPanel>
-                            <StackPanel Grid.Row="1" Spacing="14" Margin="0,18,0,0">
-                                <TextBlock Text="归档" FontSize="24" FontWeight="SemiBold" />
-                                <TextBlock Text="归档内容会保留，并可在规划中恢复。" Foreground="#66706A" />
-                                <TextBlock Text="当前版本会在路线和收件箱条目中显示归档状态。" Foreground="#66706A" />
+                        <Grid Grid.Row="1" Grid.Column="1" x:Name="ArchiveWorkspace" Padding="32,24" VerticalAlignment="Top">
+                            <StackPanel Spacing="14" Margin="0,18,0,0">
+                                <TextBlock x:Name="ArchiveTitleText" Text="归档" FontSize="24" FontWeight="SemiBold" />
+                                <TextBlock x:Name="ArchiveDescriptionText" Text="归档内容会保留，并可在规划中恢复。" Foreground="#66706A" />
+                                <TextBlock x:Name="ArchivePlaceholderText" Text="当前版本会在路线和收件箱条目中显示归档状态。" Foreground="#66706A" />
                             </StackPanel>
                         </Grid>
                     </Grid>

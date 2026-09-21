@@ -43,7 +43,7 @@ Guide mode is an interaction mode the user enters explicitly or the application 
 Use the relevant sections of these documents as needed; this is not a reading checklist for every edit. Paths are relative to the repository root.
 
 - Product behavior and state transitions: `docs/PRODUCT_SPEC.md` and the affected criteria in `docs/ACCEPTANCE.md`.
-- UI and interaction changes: `docs/UX_DESIGN.md`; consult confirmed decisions in `docs/DAILY_UI_UPDATE_NOTES.md` when relevant. Feedback and proposals do not override core product rules.
+- UI and interaction changes: `docs/UX_DESIGN.md`, the confirmed decisions in `docs/IMPLEMENTATION_PLAN.md`, and the `已确认` UI baseline in `docs/DAILY_UI_UPDATE_NOTES.md` (its raw-feedback sections are not binding decisions). Feedback and proposals do not override core product rules.
 - Technical choices and delivery scope: the confirmed decisions and relevant phase in `docs/IMPLEMENTATION_PLAN.md`, plus the assigned task's plan in `docs/plans/` if provided.
 - Windows UI verification: the applicable flows and isolated-fixture instructions in `docs/MANUAL_ACCEPTANCE.md`.
 - Earlier UI fixes or environment investigations: `docs/UI_FIX_BACKLOG.md` and `docs/TECHNICAL_SPIKE.md` are historical context. Recheck mutable status and environment facts when they matter to the task.
@@ -51,6 +51,6 @@ Use the relevant sections of these documents as needed; this is not a reading ch
 ## Completion & Permissions
 
 - Within the authorized task, proceed with local edits, builds, tests, and reruns using isolated test data without seeking approval at each step. This does not authorize modifying real user data or bypassing tool approval gates.
-- Define done from the task's acceptance criteria. For implementation work, build, run the affected tests, inspect the requested behavior, fix failures caused by the change, and rerun affected checks. Record actual commands, results, and any unverified criteria. Documentation-only work needs diff, reference, and consistency checks rather than an unrelated application build.
+- Define done from the task's acceptance criteria. For implementation work, build, run the affected tests, inspect the requested behavior, fix failures caused by the change, and rerun affected checks. Record actual commands, results, and any unverified criteria. Do not claim implementation completion without actual test and build evidence. Documentation-only work needs diff, reference, and consistency checks rather than an unrelated application build.
 - Continue through verification and fixes instead of stopping at a first implementation for review, unless the task explicitly requires that checkpoint. Respect the task's final review or handoff requirements.
 - If a genuine human decision or unavailable capability blocks completion, state the issue and the needed decision or access in one sentence; continue any independent in-scope work and report the blocker through the task's handoff channel.

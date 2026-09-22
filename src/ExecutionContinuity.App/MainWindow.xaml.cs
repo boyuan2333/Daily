@@ -191,7 +191,6 @@ public sealed partial class MainWindow : Window
                 section.Routes.Where(route => matchingRouteIds.Contains(route.Id)).ToArray()))
             .Where(section => section.Routes.Count > 0)
             .ToArray();
-            .ToArray();
         foreach (var section in sections)
         {
             RouteListPanel.Children.Add(new TextBlock

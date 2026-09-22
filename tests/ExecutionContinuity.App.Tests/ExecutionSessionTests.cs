@@ -1095,6 +1095,23 @@ public sealed class ExecutionSessionTests
         }
     }
 
+    [Fact]
+    public void Application_declares_per_monitor_v2_dpi_awareness_through_its_manifest()
+    {
+        var root = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", ".."));
+        var manifestPath = Path.Combine(root, "src", "ExecutionContinuity.App", "app.manifest");
+
+        Assert.True(File.Exists(manifestPath), "The application manifest must exist.");
+        var manifest = File.ReadAllText(manifestPath);
+        Assert.Contains("PerMonitorV2", manifest);
+        Assert.Contains("dpiAware", manifest);
+        Assert.Contains("true/PM", manifest);
+
+        var project = File.ReadAllText(Path.Combine(
+            root, "src", "ExecutionContinuity.App", "ExecutionContinuity.App.csproj"));
+        Assert.Contains("<ApplicationManifest>app.manifest</ApplicationManifest>", project);
+    }
+
     private static string NewDatabasePath() =>
         Path.Combine(Path.GetTempPath(), $"execution-continuity-app-{Guid.NewGuid():N}.db");
 

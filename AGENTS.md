@@ -54,3 +54,8 @@ Use the relevant sections of these documents as needed; this is not a reading ch
 - Define done from the task's acceptance criteria. For implementation work, build, run the affected tests, inspect the requested behavior, fix failures caused by the change, and rerun affected checks. Record actual commands, results, and any unverified criteria. Do not claim implementation completion without actual test and build evidence. Documentation-only work needs diff, reference, and consistency checks rather than an unrelated application build.
 - Continue through verification and fixes instead of stopping at a first implementation for review, unless the task explicitly requires that checkpoint. Respect the task's final review or handoff requirements.
 - If a genuine human decision or unavailable capability blocks completion, state the issue and the needed decision or access in one sentence; continue any independent in-scope work and report the blocker through the task's handoff channel.
+
+## Agent Collaboration
+
+- Follow `docs/AGENT_COLLABORATION_PLAYBOOK.md` for prompts, handoffs, same-workspace coordination, independent worktrees, and cross-computer work.
+- Treat the playbook as an operational protocol; treat `PRODUCT_SPEC.md`, `ACCEPTANCE.md`, and `IMPLEMENTATION_PLAN.md` as the product and delivery authorities.

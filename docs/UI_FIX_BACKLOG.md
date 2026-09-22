@@ -62,7 +62,7 @@
 | 编号 | 任务 | 体量 | 风险 | 推荐等级 | 状态 | 依赖 |
 | --- | --- | --- | --- | --- | --- | --- |
 | UI-001 | 排查应用启动后没有主窗口 | 大 | 高 | C | 已完成 | 无 |
-| UI-002 | 为归档内容提供可逆恢复界面 | 大 | 高 | C | 待认领 | 无 |
+| UI-002 | 为归档内容提供可逆恢复界面 | 大 | 高 | C | In Review | 无 |
 | UI-003 | 锁定 Capture 抽屉的原始上下文 | 中 | 高 | C | 已完成 | 无 |
 | UI-004 | 实现真正的窄窗口导航与自适应布局 | 大 | 中 | B | 已完成 | UI-001 建议先完成 |
 | UI-005 | 按规格重构路线列表的信息层级 | 大 | 中 | B | 已完成 | UI-001 建议先完成 |
@@ -118,9 +118,9 @@
 
 ## UI-002：为归档内容提供可逆恢复界面
 
-- **状态：** 待认领
-- **认领者：**
-- **认领时间：**
+- **状态：** In Review
+- **认领者：** Symphony Worker BOY-11 Codex
+- **认领时间：** 2026-08-09 03:42 HKT
 - **体量：** 大
 - **风险：** 高
 - **推荐等级：** C
@@ -145,7 +145,17 @@
 
 ### 结果
 
-待填写。
+- 状态：In Review；Windows 构建、自动化测试、无参数复用启动和失败存储真实窗口启动流程已验证，截图与点击级操作按手工验收脚本执行。
+- 已实现范围：领域层新增 archived route/capture 恢复转换；路线恢复记录并使用归档前生命周期，且不会恢复为 active；Inbox 恢复只清除 `IsArchived`。应用会话新增恢复命令。规划模式 Archive 页面显示「已归档路线」和「已归档收件箱条目」两个列表，并提供「恢复路线」「恢复想法」。普通 Routes/Inbox 列表排除归档内容。UI fixture 增加 UI-002 归档路线和归档 Inbox 条目。
+- 自动化覆盖：新增领域测试覆盖恢复路线只改变生命周期、恢复 Inbox 只清除归档标记；新增持久化测试覆盖恢复后重建 store 仍保留执行状态、快照、原始内容和时间戳；新增应用层失败测试覆盖提交失败时内存与持久化状态保持归档；新增静态 UI 契约测试覆盖 Archive 恢复面板和普通列表排除归档内容。
+- 已运行验证：`dotnet build ExecutionContinuity.slnx --no-restore --verbosity minimal` 通过，0 警告、0 错误；`dotnet test ExecutionContinuity.slnx --no-build --verbosity minimal` 通过，Domain 24/24、Persistence 6/6、App 28/28，共 58/58；`dotnet build tests\ExecutionContinuity.UiFixture\ExecutionContinuity.UiFixture.csproj --no-restore --verbosity minimal` 通过，0 警告、0 错误；新增 fixture 复用契约测试 1/1 通过；`git diff --check` 无空白错误。
+- 手工验证：隔离 fixture 的 Archive 页面分别显示归档路线和归档 Inbox 条目。恢复路线后显示「路线已恢复」，路线回到 Routes 且状态为「草稿」，仍提供「设为当前路线」；恢复想法后显示「想法已恢复」，Inbox 中保留原始内容和 `2026/8/5 1:30` 时间戳；再次查看 Archive 时两个列表均为空。默认 LocalAppData 数据库未被读取、修改或删除。
+- 验收工具修复：`tests\ExecutionContinuity.UiFixture\Program.cs` 新增 `--reuse` 模式；`docs\MANUAL_ACCEPTANCE.md` 的 Archive restore 流程改为首次无参数建库、重启时使用 `--reuse`，避免重启验收重新播种数据。
+- 本轮补齐：新增无参数 `ExecutionContinuity.UiFixture.Reuse.exe` 和 `ExecutionContinuity.UiFixture.FailSave.exe`，分别固定复用/重建 `.ui-review\ui004-fixture\execution-continuity.db`，并记录父子 PID、SessionId、数据库路径和失败模式；`UiFixture.exe` 现在也正确接受显式数据库路径参数。
+- 存储改造：新增 `IStateStore` 和 `FailSaveStateStore`；`ExecutionSession` 依赖接口，真实窗口仅在明确设置 `EXECUTION_CONTINUITY_FAIL_SAVE=1/true` 时注入失败存储，默认仍为 `SqliteStateStore`。startup trace 会记录实际 store 类型。
+- 自动化验证：新增失败存储委托/拒写测试、双 launcher 契约测试和显式失败开关测试；聚焦测试 3/3 通过，完整测试 24/24 Domain、6/6 Persistence、31/31 App 通过。
+- 真实启动烟雾验证：`Reuse.exe` 和 `FailSave.exe` 均成功启动真实 `Daily.exe`；两者父子进程均为 Session 1，trace 分别记录 `State store=SqliteStateStore` 与 `State store=FailSaveStateStore`，且数据库路径一致。截图和点击级 UI 操作按 `docs/MANUAL_ACCEPTANCE.md` 执行。
+- 默认 LocalAppData 数据库未用于自动验收。
 
 ## UI-003：锁定 Capture 抽屉的原始上下文
 

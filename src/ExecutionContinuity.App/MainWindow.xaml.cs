@@ -61,7 +61,21 @@ public sealed partial class MainWindow : Window
         StartupDiagnostics.Trace("MainWindow constructor before DatabaseLocator.Resolve");
         var databasePath = DatabaseLocator.Resolve();
         StartupDiagnostics.Trace("MainWindow constructor after DatabaseLocator.Resolve");
-        _session = new ExecutionSession(new SqliteStateStore(databasePath));
+        IStateStore store = new SqliteStateStore(databasePath);
+        if (string.Equals(
+                Environment.GetEnvironmentVariable(DatabaseLocator.FailSaveEnvironmentVariable),
+                "1",
+                StringComparison.OrdinalIgnoreCase)
+            || string.Equals(
+                Environment.GetEnvironmentVariable(DatabaseLocator.FailSaveEnvironmentVariable),
+                "true",
+                StringComparison.OrdinalIgnoreCase))
+        {
+            store = new FailSaveStateStore(store);
+        }
+
+        StartupDiagnostics.Trace($"State store={store.GetType().Name}");
+        _session = new ExecutionSession(store);
         Activated += MainWindow_Activated;
         StartupDiagnostics.Trace("MainWindow constructor completed");
     }
@@ -176,6 +190,7 @@ public sealed partial class MainWindow : Window
                 section.Title,
                 section.Routes.Where(route => matchingRouteIds.Contains(route.Id)).ToArray()))
             .Where(section => section.Routes.Count > 0)
+            .ToArray();
             .ToArray();
         foreach (var section in sections)
         {
@@ -327,7 +342,55 @@ public sealed partial class MainWindow : Window
         }
 
         RenderInboxDetail(visibleCaptures.SingleOrDefault(capture => capture.Id == _responsivePlanning.Inbox.SelectedItemId));
+        RenderArchive();
         UpdatePlanningLayout(PlanningPanel.ActualWidth);
+    }
+
+    private void RenderArchive()
+    {
+        ArchivedRoutesPanel.Children.Clear();
+        var archivedRoutes = _session.State.Routes
+            .Where(route => route.Lifecycle == RouteLifecycle.Archived)
+            .OrderBy(route => route.Title)
+            .ToArray();
+        foreach (var route in archivedRoutes)
+        {
+            var line = new StackPanel { Spacing = 5 };
+            line.Children.Add(new TextBlock { Text = route.Title, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold, TextWrapping = TextWrapping.Wrap });
+            line.Children.Add(new TextBlock { Text = $"{T("下一动作", "Next action")}：{route.CurrentStep()?.Action ?? T("没有未完成的动作", "No unfinished action")}", Opacity = 0.72, TextWrapping = TextWrapping.Wrap });
+            line.Children.Add(new TextBlock { Text = $"{T("恢复后状态", "Status after restore")}：{LifecycleText(route.LifecycleBeforeArchive ?? RouteLifecycle.Draft)}", Opacity = 0.62 });
+            var restore = new Button { Content = T("恢复路线", "Restore route"), Tag = route.Id.ToString(), HorizontalAlignment = HorizontalAlignment.Left };
+            restore.Click += RestoreArchivedRouteButton_Click;
+            line.Children.Add(restore);
+            ArchivedRoutesPanel.Children.Add(line);
+        }
+
+        if (archivedRoutes.Length == 0)
+        {
+            ArchivedRoutesPanel.Children.Add(new TextBlock { Text = T("没有已归档路线。", "No archived routes."), Opacity = 0.68 });
+        }
+
+        ArchivedCapturesPanel.Children.Clear();
+        var archivedCaptures = _session.State.Captures
+            .Where(capture => capture.IsArchived)
+            .OrderByDescending(capture => capture.CapturedAt)
+            .ToArray();
+        foreach (var capture in archivedCaptures)
+        {
+            var line = new StackPanel { Spacing = 5 };
+            var preview = capture.RawText.Length > 100 ? $"{capture.RawText[..100]}..." : capture.RawText;
+            line.Children.Add(new TextBlock { Text = preview, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold, TextWrapping = TextWrapping.Wrap });
+            line.Children.Add(new TextBlock { Text = $"{T("捕捉时间", "Captured at")}：{capture.CapturedAt.LocalDateTime:g}", Opacity = 0.62 });
+            var restore = new Button { Content = T("恢复想法", "Restore idea"), Tag = capture.Id.ToString(), HorizontalAlignment = HorizontalAlignment.Left };
+            restore.Click += RestoreArchivedCaptureButton_Click;
+            line.Children.Add(restore);
+            ArchivedCapturesPanel.Children.Add(line);
+        }
+
+        if (archivedCaptures.Length == 0)
+        {
+            ArchivedCapturesPanel.Children.Add(new TextBlock { Text = T("没有已归档收件箱条目。", "No archived inbox entries."), Opacity = 0.68 });
+        }
     }
 
     private void RoutesViewButton_Click(object sender, RoutedEventArgs e)
@@ -728,13 +791,59 @@ public sealed partial class MainWindow : Window
             Child = new TextBlock { Text = capture.RawText, TextWrapping = TextWrapping.Wrap, FontSize = 18 }
         };
         InboxDetailPanel.Children.Add(original);
-        var actions = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 10, Margin = new Thickness(0, 10, 0, 0) };
-        var convert = new Button { Content = T("转换为草稿路线", "Convert to draft route"), Tag = capture.Id.ToString() };
+        var actions = new StackPanel { Spacing = 12, Margin = new Thickness(0, 18, 0, 0) };
+
+        var convert = new Button
+        {
+            Tag = capture.Id.ToString(),
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            HorizontalContentAlignment = HorizontalAlignment.Stretch,
+            Background = new SolidColorBrush(ColorHelper.FromArgb(255, 238, 247, 238)),
+            BorderBrush = new SolidColorBrush(ColorHelper.FromArgb(255, 184, 210, 186)),
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(10),
+            Padding = new Thickness(16, 14, 16, 14)
+        };
+        var convertLayout = new Grid { ColumnSpacing = 14 };
+        convertLayout.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        convertLayout.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        var convertCopy = new StackPanel { Spacing = 4 };
+        convertCopy.Children.Add(new TextBlock { Text = T("整理为路线草稿", "Organize into a draft route"), FontWeight = Microsoft.UI.Text.FontWeights.SemiBold, FontSize = 16, Foreground = new SolidColorBrush(ColorHelper.FromArgb(255, 42, 90, 59)) });
+        convertCopy.Children.Add(new TextBlock { Text = T("带入规划继续整理，原始想法仍会保留。", "Continue organizing in planning; the original idea is kept."), TextWrapping = TextWrapping.Wrap, Opacity = 0.72 });
+        convertLayout.Children.Add(convertCopy);
+        var convertIcon = new FontIcon { FontFamily = new FontFamily("Segoe Fluent Icons"), Glyph = "\uE8A7", FontSize = 20, Foreground = new SolidColorBrush(ColorHelper.FromArgb(255, 42, 90, 59)) };
+        Grid.SetColumn(convertIcon, 1);
+        convertLayout.Children.Add(convertIcon);
+        convert.Content = convertLayout;
+        AutomationProperties.SetName(convert, T("整理为路线草稿", "Organize into a draft route"));
         convert.Click += ConvertCaptureButton_Click;
         actions.Children.Add(convert);
-        var archive = new Button { Content = T("归档想法", "Archive idea"), Tag = capture.Id.ToString() };
+
+        var archiveRow = new Grid { ColumnSpacing = 12, Padding = new Thickness(16, 6, 16, 6) };
+        archiveRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        archiveRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        var archiveCopy = new StackPanel { Spacing = 2 };
+        archiveCopy.Children.Add(new TextBlock { Text = T("归档想法", "Archive idea"), FontWeight = Microsoft.UI.Text.FontWeights.SemiBold });
+        archiveCopy.Children.Add(new TextBlock { Text = T("暂时移出收件箱，可在归档中恢复。", "Move out of the inbox for now; restorable from Archive."), Opacity = 0.62, TextWrapping = TextWrapping.Wrap });
+        archiveRow.Children.Add(archiveCopy);
+        var archive = new Button
+        {
+            Tag = capture.Id.ToString(),
+            Content = new FontIcon { FontFamily = new FontFamily("Segoe Fluent Icons"), Glyph = "\uE74D", FontSize = 18 },
+            Background = new SolidColorBrush(Colors.Transparent),
+            BorderBrush = new SolidColorBrush(ColorHelper.FromArgb(255, 216, 222, 215)),
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(18),
+            Padding = new Thickness(11),
+            MinWidth = 42,
+            MinHeight = 42
+        };
+        ToolTipService.SetToolTip(archive, T("归档想法", "Archive idea"));
+        Grid.SetColumn(archive, 1);
+        archiveRow.Children.Add(archive);
+        AutomationProperties.SetName(archive, T("归档想法", "Archive idea"));
         archive.Click += ArchiveCaptureButton_Click;
-        actions.Children.Add(archive);
+        actions.Children.Add(archiveRow);
         InboxDetailPanel.Children.Add(actions);
     }
 
@@ -1219,6 +1328,14 @@ public sealed partial class MainWindow : Window
         }
     }
 
+    private async void RestoreArchivedRouteButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (TryReadTag(sender, out var routeId))
+        {
+            await RunAsync(() => _session.RestoreArchivedRouteAsync(routeId), "路线已恢复。");
+        }
+    }
+
     private void ConvertCaptureButton_Click(object sender, RoutedEventArgs e)
     {
         if (!TryReadTag(sender, out var captureId))
@@ -1246,6 +1363,14 @@ public sealed partial class MainWindow : Window
         if (TryReadTag(sender, out var captureId))
         {
             await RunAsync(() => _session.ArchiveCaptureAsync(captureId), "想法已归档。");
+        }
+    }
+
+    private async void RestoreArchivedCaptureButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (TryReadTag(sender, out var captureId))
+        {
+            await RunAsync(() => _session.RestoreArchivedCaptureAsync(captureId), "想法已恢复。");
         }
     }
 

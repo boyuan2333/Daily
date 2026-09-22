@@ -129,6 +129,72 @@ public sealed class ExecutionSessionTests
     }
 
     [Fact]
+    public void Ui_fixture_supports_relaunch_without_reseeding()
+    {
+        var root = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", ".."));
+        var fixture = File.ReadAllText(Path.Combine(root, "tests", "ExecutionContinuity.UiFixture", "Program.cs"))
+            .Replace("\r\n", "\n");
+
+        Assert.Contains("--reuse", fixture);
+        Assert.Contains("Reusing fixture", fixture);
+        Assert.Contains("if (reuseExisting)", fixture);
+        Assert.Contains("if (args.Length > 1)", fixture);
+        Assert.Contains("await CreateFixtureAsync(databasePath);", fixture);
+        Assert.Contains("if (args.Length == 1 && !reuseExisting)", fixture);
+        Assert.DoesNotContain("args.Length == 1 && !reuseExisting))", fixture);
+    }
+
+    [Fact]
+    public async Task Fail_save_store_loads_real_state_but_rejects_every_write()
+    {
+        var path = NewDatabasePath();
+        try
+        {
+            var route = Route.Create("Archived", Step.Create("Action", "Done", "Boundary"));
+            var initial = AppState.Create(route);
+            await new SqliteStateStore(path).SaveAsync(initial);
+
+            var store = new FailSaveStateStore(new SqliteStateStore(path));
+            var loaded = await store.LoadAsync();
+
+            Assert.Equal(initial.Routes.Select(item => item.Id), loaded.Routes.Select(item => item.Id));
+            await Assert.ThrowsAsync<InvalidOperationException>(() => store.SaveAsync(initial));
+        }
+        finally
+        {
+            DeleteDatabase(path);
+        }
+    }
+
+    [Fact]
+    public void Ui_fixture_has_dedicated_reuse_and_fail_save_launchers()
+    {
+        var root = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", ".."));
+        var reuseProject = File.ReadAllText(Path.Combine(root, "tests", "ExecutionContinuity.UiFixture.Reuse", "Program.cs"));
+        var failProject = File.ReadAllText(Path.Combine(root, "tests", "ExecutionContinuity.UiFixture.FailSave", "Program.cs"));
+
+        Assert.Contains("ui004-fixture", reuseProject);
+        Assert.Contains("EXECUTION_CONTINUITY_DATABASE", reuseProject);
+        Assert.Contains("ExecutionContinuity.App.exe", reuseProject);
+        Assert.Contains("ui004-fixture", failProject);
+        Assert.Contains("EXECUTION_CONTINUITY_DATABASE", failProject);
+        Assert.Contains("EXECUTION_CONTINUITY_FAIL_SAVE", failProject);
+        Assert.Contains("ExecutionContinuity.App.exe", failProject);
+        Assert.DoesNotContain("CreateFixtureAsync", reuseProject);
+    }
+
+    [Fact]
+    public void Main_window_only_enables_fail_save_store_for_the_explicit_fixture_switch()
+    {
+        var root = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", ".."));
+        var code = File.ReadAllText(Path.Combine(root, "src", "ExecutionContinuity.App", "MainWindow.xaml.cs"));
+
+        Assert.Contains("DatabaseLocator.FailSaveEnvironmentVariable", code);
+        Assert.Contains("new FailSaveStateStore(store)", code);
+        Assert.Contains("State store=", code);
+    }
+
+    [Fact]
     public void Main_window_explicitly_sets_the_native_window_title()
     {
         var codePath = Path.GetFullPath(Path.Combine(
@@ -574,6 +640,59 @@ public sealed class ExecutionSessionTests
     }
 
     [Fact]
+    public void Archive_workspace_exposes_separate_restore_surfaces()
+    {
+        var xamlPath = Path.GetFullPath(Path.Combine(
+            AppContext.BaseDirectory,
+            "..", "..", "..", "..", "..",
+            "src", "ExecutionContinuity.App", "MainWindow.xaml"));
+        var xaml = File.ReadAllText(xamlPath);
+        var codePath = Path.GetFullPath(Path.Combine(
+            AppContext.BaseDirectory,
+            "..", "..", "..", "..", "..",
+            "src", "ExecutionContinuity.App", "MainWindow.xaml.cs"));
+        var code = File.ReadAllText(codePath);
+
+        Assert.Contains("x:Name=\"ArchivedRoutesPanel\"", xaml);
+        Assert.Contains("x:Name=\"ArchivedCapturesPanel\"", xaml);
+        Assert.Contains("恢复路线", code);
+        Assert.Contains("恢复想法", code);
+        Assert.Contains("RestoreArchivedRouteButton_Click", code);
+        Assert.Contains("RestoreArchivedCaptureButton_Click", code);
+        Assert.Contains("route.Lifecycle == RouteLifecycle.Archived", code);
+        Assert.Contains("capture.IsArchived", code);
+    }
+
+    [Fact]
+    public void Normal_planning_lists_exclude_archived_content()
+    {
+        var visibleRoute = Route.Create("Visible route", Step.Create("Action", "Done", "Boundary"));
+        var archivedRoute = Route.Create("Archived route", Step.Create("Action", "Done", "Boundary")) with
+        {
+            Lifecycle = RouteLifecycle.Archived
+        };
+        var state = AppState.Restore(
+            [visibleRoute, archivedRoute],
+            new ExecutionState(null, null),
+            [],
+            [
+                new CaptureEntry(Guid.NewGuid(), "visible idea", DateTimeOffset.UtcNow),
+                new CaptureEntry(Guid.NewGuid(), "archived idea", DateTimeOffset.UtcNow.AddMinutes(-1), true, "archived organized")
+            ]);
+
+        var listedRoutes = RouteListPresentation.GroupByStatus(state).SelectMany(section => section.Routes)
+            .Concat(RouteListPresentation.GroupByProject(state).SelectMany(section => section.Routes))
+            .ToArray();
+        var listedCaptures = InboxPresentation.Filter(state.Captures, InboxFilter.All, null);
+
+        Assert.Contains(listedRoutes, route => route.Id == visibleRoute.Id);
+        Assert.DoesNotContain(listedRoutes, route => route.Id == archivedRoute.Id);
+        Assert.Contains(listedCaptures, capture => capture.Id == state.Captures[0].Id);
+        Assert.DoesNotContain(listedCaptures, capture => capture.IsArchived);
+    }
+    }
+
+    [Fact]
     public void Guide_presentation_exposes_only_the_commands_allowed_by_the_execution_mode()
     {
         var fallbackRoute = Route.Create("Fallback", Step.Create("Action", "Done", "Boundary", "Fallback action"));
@@ -694,6 +813,46 @@ public sealed class ExecutionSessionTests
             var reloaded = await new ExecutionSession(new SqliteStateStore(path)).LoadAsync();
             Assert.Equal(oldRoute.Id, reloaded.Execution.ActiveRouteId);
             Assert.Empty(reloaded.Snapshots);
+        }
+        finally
+        {
+            DeleteDatabase(path);
+        }
+    }
+
+    [Fact]
+    public async Task Failed_archive_restore_keeps_visible_and_durable_state_unchanged()
+    {
+        var path = NewDatabasePath();
+        try
+        {
+            var activeRoute = Route.Create("Active", Step.Create("Active action", "Done", "Boundary"));
+            var archivedRoute = Route.Create("Archived", Step.Create("Archived action", "Done", "Boundary"));
+            var initial = StateTransitions.SelectActiveRoute(AppState.Create(activeRoute, archivedRoute), activeRoute.Id);
+            initial = StateTransitions.ArchiveRoute(initial, archivedRoute.Id);
+            initial = StateTransitions.Capture(
+                initial,
+                "archived thought",
+                new DateTimeOffset(2026, 8, 9, 4, 0, 0, TimeSpan.FromHours(8)));
+            var captureId = initial.Captures.Single().Id;
+            initial = StateTransitions.ArchiveCapture(initial, captureId);
+            await new SqliteStateStore(path).SaveAsync(initial);
+            var session = new ExecutionSession(new SqliteStateStore(
+                path,
+                beforeCommit: () => throw new InvalidOperationException("injected write failure")));
+            await session.LoadAsync();
+
+            await Assert.ThrowsAsync<InvalidOperationException>(() => session.RestoreArchivedRouteAsync(archivedRoute.Id));
+            await Assert.ThrowsAsync<InvalidOperationException>(() => session.RestoreArchivedCaptureAsync(captureId));
+
+            Assert.Equal(RouteLifecycle.Archived, session.State.Route(archivedRoute.Id).Lifecycle);
+            Assert.True(session.State.Captures.Single().IsArchived);
+            Assert.Equal(initial.Execution, session.State.Execution);
+
+            var reloaded = await new ExecutionSession(new SqliteStateStore(path)).LoadAsync();
+            Assert.Equal(RouteLifecycle.Archived, reloaded.Route(archivedRoute.Id).Lifecycle);
+            Assert.True(reloaded.Captures.Single().IsArchived);
+            Assert.Equal(initial.Execution, reloaded.Execution);
         }
         finally
         {

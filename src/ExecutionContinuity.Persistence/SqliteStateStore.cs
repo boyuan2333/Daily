@@ -4,7 +4,7 @@ using Microsoft.Data.Sqlite;
 
 namespace ExecutionContinuity.Persistence;
 
-public sealed class SqliteStateStore
+public sealed class SqliteStateStore : IStateStore
 {
     private static readonly JsonSerializerOptions JsonOptions = new()
     {

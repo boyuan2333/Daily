@@ -690,7 +690,6 @@ public sealed class ExecutionSessionTests
         Assert.Contains(listedCaptures, capture => capture.Id == state.Captures[0].Id);
         Assert.DoesNotContain(listedCaptures, capture => capture.IsArchived);
     }
-    }
 
     [Fact]
     public void Guide_presentation_exposes_only_the_commands_allowed_by_the_execution_mode()
